@@ -1,0 +1,61 @@
+import { useState, useEffect } from 'react';
+import { FamilyMember, SAMPLE_MEMBERS } from '../types/family';
+
+const STORAGE_KEY = 'gkshah_family_members';
+
+export function useFamilyStore() {
+  const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadData = () => {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (data) {
+          setMembers(JSON.parse(data));
+        } else {
+          // Initialize with sample data if empty
+          setMembers(SAMPLE_MEMBERS);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_MEMBERS));
+        }
+      } catch (error) {
+        console.error('Failed to load family members from localStorage', error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  const saveMembers = (newMembers: FamilyMember[]) => {
+    setMembers(newMembers);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newMembers));
+  };
+
+  const addMember = (member: Omit<FamilyMember, 'id'>) => {
+    const newMember = { ...member, id: crypto.randomUUID() };
+    saveMembers([...members, newMember]);
+    return newMember;
+  };
+
+  const updateMember = (id: string, updates: Partial<FamilyMember>) => {
+    saveMembers(members.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const deleteMember = (id: string) => {
+    saveMembers(members.filter(m => m.id !== id));
+  };
+  
+  const importMembers = (importedMembers: FamilyMember[]) => {
+    saveMembers(importedMembers);
+  };
+
+  return {
+    members,
+    isLoaded,
+    addMember,
+    updateMember,
+    deleteMember,
+    importMembers,
+  };
+}

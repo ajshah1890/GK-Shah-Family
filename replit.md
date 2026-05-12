@@ -1,36 +1,55 @@
-# [Project name]
+# G K Shah Family Directory
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A private, mobile-first family network and directory PWA for the G K Shah family — installable on Android and iPhone, works fully offline after install.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/family-directory run dev` — run the frontend (port 20214)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, not used by app)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React + Vite + Tailwind CSS v4
+- Routing: wouter
+- Forms: react-hook-form + zod
+- Charts: recharts
+- Date utilities: date-fns
+- Animations: framer-motion
+- Themes: next-themes (dark mode)
+- Toasts: sonner
+- Icons: lucide-react
+- Storage: localStorage (no backend required)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/family-directory/src/` — main React app
+- `artifacts/family-directory/src/hooks/useFamilyStore.ts` — localStorage CRUD store (source of truth for all data)
+- `artifacts/family-directory/src/types/family.ts` — FamilyMember interface + sample data
+- `artifacts/family-directory/src/pages/` — all pages (Dashboard, Members, MemberProfile, MemberForm, Statistics, Settings)
+- `artifacts/family-directory/src/components/` — layout, member cards, filters, dashboard widgets
+- `artifacts/family-directory/public/manifest.json` — PWA manifest
+- `artifacts/family-directory/public/sw.js` — service worker for offline support
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- All data stored in localStorage under key `gkshah_family_members` — no backend needed, fully offline-capable
+- Photos stored as base64 data URLs in localStorage
+- PWA-first: manifest.json + service worker enable "Add to Home Screen" on Android/iOS
+- Warm amber/terracotta palette to feel like a family heirloom, not a generic contacts app
+- Recharts used for statistics visualizations (city, blood group, branch, profession breakdowns)
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Dashboard with live stats: total members, upcoming birthdays (next 30 days), upcoming anniversaries
+- Members directory with search (name, city, profession, company) and filters (city, country, branch, profession)
+- Full member profile pages with call/WhatsApp/email action buttons
+- Add/edit/delete members with photo upload (base64 stored locally)
+- Family statistics page with charts
+- Import/export JSON for data backup and sharing
+- Dark mode toggle
 
 ## User preferences
 
@@ -38,7 +57,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- No backend: all data lives in the browser's localStorage — data is per-device and per-browser
+- Photos are stored as base64 in localStorage — large photos may approach storage limits; recommend compressing before uploading
+- PWA install prompt appears in browser's address bar after first visit on mobile
 
 ## Pointers
 

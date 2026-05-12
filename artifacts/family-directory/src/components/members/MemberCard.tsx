@@ -8,6 +8,20 @@ interface MemberCardProps {
 }
 
 export function MemberCard({ member }: MemberCardProps) {
+  const renderGenerationBadge = (gen?: string) => {
+    if (!gen) return null;
+    let colorClass = "bg-muted text-muted-foreground border-border";
+    if (gen.includes("1st")) colorClass = "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/50";
+    else if (gen.includes("2nd")) colorClass = "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50";
+    else if (gen.includes("3rd")) colorClass = "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/50";
+    
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${colorClass}`}>
+        {gen}
+      </span>
+    );
+  };
+
   return (
     <Link href={`/members/${member.id}`}>
       <Card className="hover-elevate cursor-pointer overflow-hidden group border border-border transition-all">
@@ -30,17 +44,20 @@ export function MemberCard({ member }: MemberCardProps) {
               {member.fullName}
             </h3>
             
-            <div className="flex flex-col gap-1 items-center">
-              {member.mainFamilyBranch && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
-                  {member.mainFamilyBranch}
-                </span>
-              )}
-              {member.subFamilyBranch && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border/50">
-                  {member.subFamilyBranch}
-                </span>
-              )}
+            <div className="flex flex-col gap-1.5 items-center w-full">
+              <div className="flex flex-wrap justify-center gap-1">
+                {member.mainFamilyBranch && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+                    {member.mainFamilyBranch}
+                  </span>
+                )}
+                {member.subFamilyBranch && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border/50">
+                    {member.subFamilyBranch}
+                  </span>
+                )}
+              </div>
+              {renderGenerationBadge(member.generation)}
             </div>
           </div>
           

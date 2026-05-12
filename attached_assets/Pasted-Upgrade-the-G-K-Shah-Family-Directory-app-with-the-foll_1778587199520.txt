@@ -1,0 +1,116 @@
+Upgrade the “G K Shah Family Directory” app with the following features and improvements:
+
+1. Excel / CSV Import System
+- Add bulk import using Excel and CSV files
+- Automatically map spreadsheet columns to member fields
+- Show import preview before saving
+- Handle duplicate members intelligently
+- Allow export back to CSV and Excel
+
+2. Generation System
+- Add a “Generation” field
+- Example values:
+  - 1st Generation
+  - 2nd Generation
+  - 3rd Generation
+- Add generation filters and grouping
+- Show generation badges on member cards and profiles
+
+3. Admin Mode
+- Add admin-only editing system
+- Simple password-protected admin mode
+- Only admins can:
+  - Add members
+  - Edit members
+  - Delete members
+- Non-admin users can only browse/search/view profiles
+
+4. Enhanced Member Profiles
+Add these new fields:
+- Date of Birth
+- Anniversary Date
+- Gender
+- Current Company
+- Previous Company
+- LinkedIn Profile
+- Instagram Profile
+- Business Name
+- Native Place
+- Hobbies
+- Skills
+- Languages Spoken
+- Emergency Contact
+- Personal Website
+- Notes/About Member
+
+5. Google Maps Integration
+- Show clickable “Open in Google Maps” button
+- Add embedded mini-map preview if address link exists
+- Add navigation icon
+
+6. Improved Dashboard
+Add:
+- Total members count
+- Members by city
+- Members by profession
+- Members by generation
+- Upcoming birthdays this week
+- Upcoming anniversaries this month
+- Recently added members
+
+7. Family Tree Improvements
+- Better interactive visual tree
+- Smooth zoom and pan
+- Different colors for generations
+- Spouse connections
+- Parent-child hierarchy
+- Branch grouping
+- Mobile-friendly layout
+
+8. Search & Discovery Improvements
+- Smart global search
+- Search suggestions
+- Partial name matching
+- Filters for:
+  - City
+  - Country
+  - Profession
+  - Company
+  - Generation
+  - Main Family Branch
+  - Sub Family Branch
+  - Blood Group
+  - Gender
+
+9. Profile Sharing
+- Add “Share Member Profile” functionality
+- Generate shareable profile cards
+- Add WhatsApp sharing button
+
+10. PWA Improvements
+- Better offline support
+- Install app prompt
+- Faster loading
+- App icon and splash screen
+- Mobile app-like animations
+
+11. Data Safety
+- Auto backup to downloadable JSON
+- Restore from backup option
+- Prevent accidental deletion with confirmation popups
+
+12. UI/UX Improvements
+- Premium modern UI
+- Better typography
+- Responsive design improvements
+- Smooth animations
+- Cleaner cards
+- Better spacing
+- Dark mode improvements
+
+13. Compatibility
+- Ensure all old sample data and existing members continue working without crashes
+- Update local storage schema safely with backward compatibility
+
+14. Final Goal
+Optimize the app to become a complete private family directory platform that works fully offline, can be installed like an app, and can be hosted free forever on GitHub Pages.

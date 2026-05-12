@@ -32,6 +32,8 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
   const [subBranchFilter, setSubBranchFilter] = useState("all");
   const [bloodGroupFilter, setBloodGroupFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [generationFilter, setGenerationFilter] = useState("all");
 
   const cities = useMemo(() => Array.from(new Set(members.map(m => m.city).filter(Boolean) as string[])).sort(), [members]);
   const countries = useMemo(() => Array.from(new Set(members.map(m => m.country).filter(Boolean) as string[])).sort(), [members]);
@@ -40,6 +42,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
   const subBranches = useMemo(() => Array.from(new Set(members.map(m => m.subFamilyBranch).filter(Boolean) as string[])).sort(), [members]);
   const bloodGroups = useMemo(() => Array.from(new Set(members.map(m => m.bloodGroup).filter(Boolean) as string[])).sort(), [members]);
   const companies = useMemo(() => Array.from(new Set(members.map(m => m.company).filter(Boolean) as string[])).sort(), [members]);
+  const generations = useMemo(() => Array.from(new Set(members.map(m => m.generation).filter(Boolean) as string[])).sort(), [members]);
 
   const searchSuggestions = useMemo(() => {
     if (!search.trim()) return [];
@@ -47,7 +50,6 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
     return members.filter(m => m.fullName.toLowerCase().includes(q)).slice(0, 6);
   }, [members, search]);
 
-  // Use useEffect (not useMemo) to call onFilterChange — avoids setState-during-render
   useEffect(() => {
     let result = members;
 
@@ -59,7 +61,10 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
         (m.profession && m.profession.toLowerCase().includes(q)) ||
         (m.company && m.company.toLowerCase().includes(q)) ||
         (m.mainFamilyBranch && m.mainFamilyBranch.toLowerCase().includes(q)) ||
-        (m.subFamilyBranch && m.subFamilyBranch.toLowerCase().includes(q))
+        (m.subFamilyBranch && m.subFamilyBranch.toLowerCase().includes(q)) ||
+        (m.generation && m.generation.toLowerCase().includes(q)) ||
+        (m.gender && m.gender.toLowerCase().includes(q)) ||
+        (m.nativePlace && m.nativePlace.toLowerCase().includes(q))
       );
     }
 
@@ -70,9 +75,11 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
     if (subBranchFilter !== "all") result = result.filter(m => m.subFamilyBranch === subBranchFilter);
     if (bloodGroupFilter !== "all") result = result.filter(m => m.bloodGroup === bloodGroupFilter);
     if (companyFilter !== "all") result = result.filter(m => m.company === companyFilter);
+    if (genderFilter !== "all") result = result.filter(m => m.gender === genderFilter);
+    if (generationFilter !== "all") result = result.filter(m => m.generation === generationFilter);
 
     onFilterChange(result);
-  }, [members, search, cityFilter, countryFilter, professionFilter, mainBranchFilter, subBranchFilter, bloodGroupFilter, companyFilter, onFilterChange]);
+  }, [members, search, cityFilter, countryFilter, professionFilter, mainBranchFilter, subBranchFilter, bloodGroupFilter, companyFilter, genderFilter, generationFilter, onFilterChange]);
 
   const activeFiltersCount =
     (cityFilter !== "all" ? 1 : 0) +
@@ -81,7 +88,9 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
     (mainBranchFilter !== "all" ? 1 : 0) +
     (subBranchFilter !== "all" ? 1 : 0) +
     (bloodGroupFilter !== "all" ? 1 : 0) +
-    (companyFilter !== "all" ? 1 : 0);
+    (companyFilter !== "all" ? 1 : 0) +
+    (genderFilter !== "all" ? 1 : 0) +
+    (generationFilter !== "all" ? 1 : 0);
 
   const clearFilters = () => {
     setCityFilter("all");
@@ -91,6 +100,8 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
     setSubBranchFilter("all");
     setBloodGroupFilter("all");
     setCompanyFilter("all");
+    setGenderFilter("all");
+    setGenerationFilter("all");
     setSearch("");
   };
 
@@ -101,7 +112,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             data-testid="input-search"
-            placeholder="Search by name, city, profession, branch..."
+            placeholder="Search by name, city, profession, branch, generation..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -141,21 +152,46 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-4 max-h-[80vh] overflow-y-auto" align="end">
+          <PopoverContent className="w-[340px] p-4 max-h-[80vh] overflow-y-auto" align="end">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-border pb-2">
                 <h4 className="font-medium font-serif">Filter Members</h4>
                 {activeFiltersCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs" data-testid="button-clear-filters">
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
                     Clear all
                   </Button>
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Gender</label>
+                  <Select value={genderFilter} onValueChange={setGenderFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Genders" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Genders</SelectItem>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Generation</label>
+                  <Select value={generationFilter} onValueChange={setGenerationFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Gens" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Gens</SelectItem>
+                      {generations.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Main Branch</label>
                 <Select value={mainBranchFilter} onValueChange={setMainBranchFilter}>
-                  <SelectTrigger data-testid="select-main-branch"><SelectValue placeholder="All Branches" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Branches</SelectItem>
                     {mainBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -163,10 +199,10 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Sub Branch</label>
                 <Select value={subBranchFilter} onValueChange={setSubBranchFilter}>
-                  <SelectTrigger data-testid="select-sub-branch"><SelectValue placeholder="All Sub Branches" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Sub Branches" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sub Branches</SelectItem>
                     {subBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -174,21 +210,21 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">City</label>
                   <Select value={cityFilter} onValueChange={setCityFilter}>
-                    <SelectTrigger data-testid="select-city"><SelectValue placeholder="All Cities" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Cities" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Cities</SelectItem>
                       {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Country</label>
                   <Select value={countryFilter} onValueChange={setCountryFilter}>
-                    <SelectTrigger data-testid="select-country"><SelectValue placeholder="All Countries" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Countries" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Countries</SelectItem>
                       {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -197,21 +233,21 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Blood Group</label>
                   <Select value={bloodGroupFilter} onValueChange={setBloodGroupFilter}>
-                    <SelectTrigger data-testid="select-blood-group"><SelectValue placeholder="All Groups" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Groups" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Groups</SelectItem>
                       {bloodGroups.map(bg => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Company</label>
                   <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                    <SelectTrigger data-testid="select-company"><SelectValue placeholder="All Companies" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Companies" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Companies</SelectItem>
                       {companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -220,10 +256,10 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Profession</label>
                 <Select value={professionFilter} onValueChange={setProfessionFilter}>
-                  <SelectTrigger data-testid="select-profession"><SelectValue placeholder="All Professions" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Professions" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Professions</SelectItem>
                     {professions.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -238,6 +274,18 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
       {activeFiltersCount > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-xs text-muted-foreground mr-1">Active filters:</span>
+          {genderFilter !== "all" && (
+            <Badge variant="secondary" className="flex items-center gap-1 font-normal bg-primary/10 text-primary border-primary/20">
+              Gender: {genderFilter}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setGenderFilter("all")} />
+            </Badge>
+          )}
+          {generationFilter !== "all" && (
+            <Badge variant="secondary" className="flex items-center gap-1 font-normal bg-primary/10 text-primary border-primary/20">
+              Generation: {generationFilter}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setGenerationFilter("all")} />
+            </Badge>
+          )}
           {mainBranchFilter !== "all" && (
             <Badge variant="secondary" className="flex items-center gap-1 font-normal bg-primary/10 text-primary border-primary/20">
               Main Branch: {mainBranchFilter}

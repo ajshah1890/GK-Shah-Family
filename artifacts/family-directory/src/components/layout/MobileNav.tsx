@@ -1,12 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, PieChart, Settings, Network } from "lucide-react";
+import { LayoutDashboard, Users, Settings, Network, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Home", href: "/", icon: LayoutDashboard },
   { name: "Members", href: "/members", icon: Users },
   { name: "Tree", href: "/family-tree", icon: Network },
-  { name: "Stats", href: "/statistics", icon: PieChart },
+  { name: "Import", href: "/import", icon: FileSpreadsheet },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

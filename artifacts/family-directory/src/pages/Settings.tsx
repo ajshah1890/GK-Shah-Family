@@ -4,14 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Download, Upload, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Download, Upload, Info, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { useAdminMode } from "@/hooks/useAdminMode";
+import { Link } from "wouter";
 
 export default function Settings() {
   const { members, importMembers } = useFamilyStore();
   const { theme } = useTheme();
+  const { changePassword, isAdmin } = useAdminMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const toggleTheme = () => {
     if (theme === "dark") {
@@ -61,6 +68,22 @@ export default function Settings() {
     reader.readAsText(file);
   };
 
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      toast.error("Please fill in both fields");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    changePassword(newPassword);
+    toast.success("Admin password changed successfully");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       <div>
@@ -88,14 +111,61 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-serif">Data Management</CardTitle>
-          <CardDescription>Export your family data for backup, or import from a previous backup.</CardDescription>
+          <CardTitle className="font-serif">Import Data</CardTitle>
+          <CardDescription>Import contacts from CSV or Excel files.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/import">
+            <Button className="gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Go to Import Page
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-serif">Admin Access</CardTitle>
+            <CardDescription>Change the master password used to manage the directory.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input 
+                  id="new-password" 
+                  type="password" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input 
+                  id="confirm-password" 
+                  type="password" 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              <Button type="submit">Change Password</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif">Raw Data Backup</CardTitle>
+          <CardDescription>Export or restore the raw JSON data of your directory.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <Button onClick={handleExport} className="flex-1 gap-2" variant="outline">
               <Download className="w-4 h-4" />
-              Export Backup (JSON)
+              Export JSON Backup
             </Button>
             
             <input 
@@ -107,7 +177,7 @@ export default function Settings() {
             />
             <Button onClick={() => fileInputRef.current?.click()} className="flex-1 gap-2" variant="outline">
               <Upload className="w-4 h-4" />
-              Import Backup
+              Restore JSON Backup
             </Button>
           </div>
           

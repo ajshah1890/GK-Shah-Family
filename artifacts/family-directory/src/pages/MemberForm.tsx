@@ -26,10 +26,14 @@ import {
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useAdminMode } from "@/hooks/useAdminMode";
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   photo: z.string().optional(),
+  gender: z.enum(["Male", "Female", "Other"]).optional(),
+  generation: z.string().optional(),
+  nativePlace: z.string().optional(),
   birthday: z.string().optional(),
   anniversary: z.string().optional(),
   address: z.string().optional(),
@@ -39,14 +43,23 @@ const formSchema = z.object({
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  personalWebsite: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  linkedIn: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  instagram: z.string().optional(),
   profession: z.string().optional(),
   company: z.string().optional(),
+  previousCompany: z.string().optional(),
+  businessName: z.string().optional(),
   education: z.string().optional(),
   bloodGroup: z.string().optional(),
   mainFamilyBranch: z.string().optional(),
   subFamilyBranch: z.string().optional(),
   spouseName: z.string().optional(),
   childrenNamesStr: z.string().optional(),
+  hobbies: z.string().optional(),
+  skills: z.string().optional(),
+  languagesSpoken: z.string().optional(),
+  emergencyContact: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -57,6 +70,7 @@ export default function MemberForm() {
   const isEditing = id !== "new" && !!id;
   const [, setLocation] = useLocation();
   const { members, addMember, updateMember, isLoaded } = useFamilyStore();
+  const { isAdmin } = useAdminMode();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
@@ -64,6 +78,9 @@ export default function MemberForm() {
     defaultValues: {
       fullName: "",
       photo: "",
+      gender: undefined,
+      generation: "",
+      nativePlace: "",
       birthday: "",
       anniversary: "",
       address: "",
@@ -73,14 +90,23 @@ export default function MemberForm() {
       phone: "",
       whatsapp: "",
       email: "",
+      personalWebsite: "",
+      linkedIn: "",
+      instagram: "",
       profession: "",
       company: "",
+      previousCompany: "",
+      businessName: "",
       education: "",
       bloodGroup: "",
       mainFamilyBranch: "",
       subFamilyBranch: "",
       spouseName: "",
       childrenNamesStr: "",
+      hobbies: "",
+      skills: "",
+      languagesSpoken: "",
+      emergencyContact: "",
       notes: "",
     },
   });
@@ -101,6 +127,18 @@ export default function MemberForm() {
   }, [isLoaded, isEditing, id, members, form]);
 
   if (!isLoaded) return null;
+
+  if (!isAdmin) {
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold font-serif mb-4">Access Denied</h2>
+        <p className="text-muted-foreground mb-6">You need admin access to add or edit members.</p>
+        <Button onClick={() => setLocation("/members")}>
+          Return to Directory
+        </Button>
+      </div>
+    );
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -218,26 +256,45 @@ export default function MemberForm() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="mainFamilyBranch"
+                      name="gender"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Main Family Branch</FormLabel>
-                          <FormControl>
-                            <Input placeholder="E.g. Mumbai Branch" {...field} />
-                          </FormControl>
+                          <FormLabel>Gender</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Gender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Male">Male</SelectItem>
+                              <SelectItem value="Female">Female</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     <FormField
                       control={form.control}
-                      name="subFamilyBranch"
+                      name="generation"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Sub Family Branch</FormLabel>
-                          <FormControl>
-                            <Input placeholder="E.g. Elder Line" {...field} />
-                          </FormControl>
+                          <FormLabel>Generation</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Generation" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1st Generation">1st Generation</SelectItem>
+                              <SelectItem value="2nd Generation">2nd Generation</SelectItem>
+                              <SelectItem value="3rd Generation">3rd Generation</SelectItem>
+                              <SelectItem value="4th Generation">4th Generation</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -245,6 +302,53 @@ export default function MemberForm() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Family Classification</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="mainFamilyBranch"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Main Family Branch</FormLabel>
+                    <FormControl>
+                      <Input placeholder="E.g. Mumbai Branch" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="subFamilyBranch"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sub Family Branch</FormLabel>
+                    <FormControl>
+                      <Input placeholder="E.g. Elder Line" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nativePlace"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Native Place</FormLabel>
+                    <FormControl>
+                      <Input placeholder="E.g. Rajkot" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -317,10 +421,57 @@ export default function MemberForm() {
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="example@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="personalWebsite"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Personal Website</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Social & Professional Links</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="linkedIn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>LinkedIn URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://linkedin.com/in/..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="instagram"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instagram Handle/URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="@handle or https://..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -416,9 +567,35 @@ export default function MemberForm() {
                   name="company"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Company</FormLabel>
+                      <FormLabel>Current Company</FormLabel>
                       <FormControl>
                         <Input placeholder="E.g. Tech Corp" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="previousCompany"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Previous Company</FormLabel>
+                      <FormControl>
+                        <Input placeholder="E.g. Old Corp" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="businessName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="E.g. Shah Enterprises" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -492,6 +669,68 @@ export default function MemberForm() {
                         <Input placeholder="Comma separated names" {...field} />
                       </FormControl>
                       <FormDescription>E.g. Ravi, Sneha</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Personal Interests</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="hobbies"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hobbies</FormLabel>
+                      <FormControl>
+                        <Input placeholder="E.g. Reading, Traveling" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="skills"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Skills</FormLabel>
+                      <FormControl>
+                        <Input placeholder="E.g. Photography, Cooking" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="languagesSpoken"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Languages Spoken</FormLabel>
+                      <FormControl>
+                        <Input placeholder="E.g. English, Gujarati, Hindi" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="emergencyContact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Emergency Contact</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Name & Phone" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

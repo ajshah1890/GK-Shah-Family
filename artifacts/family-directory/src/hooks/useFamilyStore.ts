@@ -47,7 +47,11 @@ export function useFamilyStore() {
   };
 
   const addMember = (member: Omit<FamilyMember, 'id'>) => {
-    const newMember = { ...member, id: crypto.randomUUID() };
+    const newMember = { 
+      ...member, 
+      id: crypto.randomUUID(),
+      addedAt: new Date().toISOString(),
+    };
     saveMembers([...members, newMember]);
     return newMember;
   };

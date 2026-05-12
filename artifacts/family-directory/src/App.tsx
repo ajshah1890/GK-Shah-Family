@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Members from "@/pages/Members";
 import MemberProfile from "@/pages/MemberProfile";
 import MemberForm from "@/pages/MemberForm";
+import FamilyTree from "@/pages/FamilyTree";
 import Statistics from "@/pages/Statistics";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/members/new" component={MemberForm} />
         <Route path="/members/:id/edit" component={MemberForm} />
         <Route path="/members/:id" component={MemberProfile} />
+        <Route path="/family-tree" component={FamilyTree} />
         <Route path="/statistics" component={Statistics} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />

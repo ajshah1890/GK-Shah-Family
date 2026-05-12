@@ -3,6 +3,20 @@ import { FamilyMember, SAMPLE_MEMBERS } from '../types/family';
 
 const STORAGE_KEY = 'gkshah_family_members';
 
+function migrateMembers(raw: unknown[]): FamilyMember[] {
+  return raw.map((m: any) => {
+    const migrated = { ...m };
+    // Remove old field
+    delete migrated.relationship;
+    // Migrate familyBranch -> mainFamilyBranch
+    if (m.familyBranch && !m.mainFamilyBranch) {
+      migrated.mainFamilyBranch = m.familyBranch;
+    }
+    delete migrated.familyBranch;
+    return migrated as FamilyMember;
+  });
+}
+
 export function useFamilyStore() {
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -12,7 +26,7 @@ export function useFamilyStore() {
       try {
         const data = localStorage.getItem(STORAGE_KEY);
         if (data) {
-          setMembers(JSON.parse(data));
+          setMembers(migrateMembers(JSON.parse(data)));
         } else {
           // Initialize with sample data if empty
           setMembers(SAMPLE_MEMBERS);

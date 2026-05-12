@@ -98,14 +98,20 @@ export default function MemberProfile() {
                 </div>
               )}
             </div>
-            <h1 className="text-2xl font-serif font-bold text-foreground mb-1">{member.fullName}</h1>
-            <p className="text-lg text-primary font-medium mb-4">{member.relationship}</p>
+            <h1 className="text-2xl font-serif font-bold text-foreground mb-4">{member.fullName}</h1>
             
-            {member.familyBranch && (
-              <div className="inline-block px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold mb-6">
-                {member.familyBranch}
-              </div>
-            )}
+            <div className="flex flex-col items-center gap-2 mb-6">
+              {member.mainFamilyBranch && (
+                <div className="inline-block px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                  {member.mainFamilyBranch}
+                </div>
+              )}
+              {member.subFamilyBranch && (
+                <div className="inline-block px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border text-[10px] font-medium">
+                  {member.subFamilyBranch}
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-wrap justify-center gap-2">
               {member.phone && (
@@ -219,6 +225,24 @@ export default function MemberProfile() {
                           </div>
                         </div>
                       )}
+                      {member.mapsLink && (
+                        <div className="flex gap-3 col-span-full">
+                          <MapPin className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Google Maps</p>
+                            <a
+                              href={member.mapsLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
+                              data-testid="link-maps"
+                            >
+                              <MapPin className="w-3.5 h-3.5" />
+                              Open Address in Maps
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground italic col-span-full">No contact details provided.</p>
@@ -245,8 +269,8 @@ export default function MemberProfile() {
                       )}
                       {member.education && (
                         <div className="flex gap-3 col-span-full">
-                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                             🎓
+                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5 font-serif font-bold text-lg text-muted-foreground">
+                            E
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Education</p>

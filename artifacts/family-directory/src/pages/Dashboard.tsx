@@ -1,17 +1,50 @@
 import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
-import { Users, UserPlus, FileText, PieChart } from "lucide-react";
+import { Users, UserPlus, FileText, PieChart, Info } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useState, useEffect } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Dashboard() {
   const { members, isLoaded } = useFamilyStore();
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+
+  useNotifications(members);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      setShowNotificationBanner(true);
+    }
+  }, []);
+
+  const requestNotifications = () => {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(() => {
+        setShowNotificationBanner(false);
+      });
+    }
+  };
 
   if (!isLoaded) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {showNotificationBanner && (
+        <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-400">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+          <AlertTitle>Enable Notifications</AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+            <span>Enable notifications to get birthday and anniversary reminders at 8 AM every day.</span>
+            <Button size="sm" variant="outline" className="shrink-0 bg-background" onClick={requestNotifications}>
+              Enable Notifications
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <section className="bg-card rounded-xl p-8 border border-border text-center sm:text-left flex flex-col sm:flex-row items-center sm:justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none"></div>
         <div className="relative z-10 space-y-2">

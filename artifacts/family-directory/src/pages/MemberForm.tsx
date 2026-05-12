@@ -29,11 +29,11 @@ import { toast } from "sonner";
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
-  relationship: z.string().min(2, "Relationship is required"),
   photo: z.string().optional(),
   birthday: z.string().optional(),
   anniversary: z.string().optional(),
   address: z.string().optional(),
+  mapsLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   city: z.string().optional(),
   country: z.string().optional(),
   phone: z.string().optional(),
@@ -43,7 +43,8 @@ const formSchema = z.object({
   company: z.string().optional(),
   education: z.string().optional(),
   bloodGroup: z.string().optional(),
-  familyBranch: z.string().optional(),
+  mainFamilyBranch: z.string().optional(),
+  subFamilyBranch: z.string().optional(),
   spouseName: z.string().optional(),
   childrenNamesStr: z.string().optional(),
   notes: z.string().optional(),
@@ -62,11 +63,11 @@ export default function MemberForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullName: "",
-      relationship: "",
       photo: "",
       birthday: "",
       anniversary: "",
       address: "",
+      mapsLink: "",
       city: "",
       country: "",
       phone: "",
@@ -76,7 +77,8 @@ export default function MemberForm() {
       company: "",
       education: "",
       bloodGroup: "",
-      familyBranch: "",
+      mainFamilyBranch: "",
+      subFamilyBranch: "",
       spouseName: "",
       childrenNamesStr: "",
       notes: "",
@@ -216,12 +218,12 @@ export default function MemberForm() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="relationship"
+                      name="mainFamilyBranch"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Relationship *</FormLabel>
+                          <FormLabel>Main Family Branch</FormLabel>
                           <FormControl>
-                            <Input placeholder="E.g. Son, Daughter-in-law" {...field} />
+                            <Input placeholder="E.g. Mumbai Branch" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -229,12 +231,12 @@ export default function MemberForm() {
                     />
                     <FormField
                       control={form.control}
-                      name="familyBranch"
+                      name="subFamilyBranch"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Family Branch</FormLabel>
+                          <FormLabel>Sub Family Branch</FormLabel>
                           <FormControl>
-                            <Input placeholder="E.g. Mumbai Branch" {...field} />
+                            <Input placeholder="E.g. Elder Line" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -369,6 +371,20 @@ export default function MemberForm() {
                     <FormControl>
                       <Textarea placeholder="Full residential address" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mapsLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Google Maps Link</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://maps.google.com/..." {...field} />
+                    </FormControl>
+                    <FormDescription>Paste a Google Maps link to this member's address</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

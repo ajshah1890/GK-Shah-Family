@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, PieChart, Settings } from "lucide-react";
+import { LayoutDashboard, Users, PieChart, Settings, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Members", href: "/members", icon: Users },
+  { name: "Family Tree", href: "/family-tree", icon: Network },
   { name: "Statistics", href: "/statistics", icon: PieChart },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -23,7 +24,7 @@ export function Sidebar() {
         </h1>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           return (

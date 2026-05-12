@@ -31,7 +31,7 @@ export default function Statistics() {
   const branchData = useMemo(() => {
     const counts: Record<string, number> = {};
     members.forEach(m => {
-      if (m.familyBranch) counts[m.familyBranch] = (counts[m.familyBranch] || 0) + 1;
+      if (m.mainFamilyBranch) counts[m.mainFamilyBranch] = (counts[m.mainFamilyBranch] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [members]);
@@ -94,7 +94,7 @@ export default function Statistics() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-serif">Family Branches</CardTitle>
+            <CardTitle className="font-serif">Main Family Branches</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">

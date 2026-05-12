@@ -26,15 +26,22 @@ export function MemberCard({ member }: MemberCardProps) {
                 </div>
               )}
             </div>
-            <h3 className="font-serif font-bold text-lg group-hover:text-primary transition-colors line-clamp-1 w-full">
+            <h3 className="font-serif font-bold text-lg group-hover:text-primary transition-colors line-clamp-1 w-full mb-2">
               {member.fullName}
             </h3>
-            <p className="text-sm font-medium text-primary/80 mb-1">{member.relationship}</p>
-            {member.familyBranch && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
-                {member.familyBranch}
-              </span>
-            )}
+            
+            <div className="flex flex-col gap-1 items-center">
+              {member.mainFamilyBranch && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+                  {member.mainFamilyBranch}
+                </span>
+              )}
+              {member.subFamilyBranch && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border/50">
+                  {member.subFamilyBranch}
+                </span>
+              )}
+            </div>
           </div>
           
           <div className="p-4 bg-muted/20 space-y-2 text-sm text-muted-foreground">

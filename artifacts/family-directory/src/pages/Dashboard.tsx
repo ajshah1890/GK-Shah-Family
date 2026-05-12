@@ -2,7 +2,7 @@ import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
-import { Users, UserPlus, FileText, PieChart, Info, MapPin, Download } from "lucide-react";
+import { Users, UserPlus, FileText, PieChart, Info, MapPin, Download, GitBranch } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -157,7 +157,7 @@ export default function Dashboard() {
         <StatCard 
           title="Generations" 
           value={members.some(m => m.generation) ? members.filter(m => m.generation).length : 0} 
-          icon={<Network className="w-5 h-5 text-blue-500" />} 
+          icon={<GitBranch className="w-5 h-5 text-blue-500" />} 
           description={generationStats}
         />
       </div>

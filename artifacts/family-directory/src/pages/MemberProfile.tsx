@@ -177,24 +177,28 @@ export default function MemberProfile() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {(member.birthday || member.anniversary || member.bloodGroup || member.nativePlace) ? (
                     <>
-                      {member.birthday && (
-                        <div className="flex gap-3">
-                          <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Birthday</p>
-                            <p className="font-medium">{format(parseISO(member.birthday), "MMMM d, yyyy")}</p>
+                      {member.birthday && (() => {
+                        try { const d = parseISO(member.birthday); return (
+                          <div className="flex gap-3">
+                            <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Birthday</p>
+                              <p className="font-medium">{format(d, "MMMM d, yyyy")}</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {member.anniversary && (
-                        <div className="flex gap-3">
-                          <Heart className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Anniversary</p>
-                            <p className="font-medium">{format(parseISO(member.anniversary), "MMMM d, yyyy")}</p>
+                        ); } catch { return null; }
+                      })()}
+                      {member.anniversary && (() => {
+                        try { const d = parseISO(member.anniversary); return (
+                          <div className="flex gap-3">
+                            <Heart className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Anniversary</p>
+                              <p className="font-medium">{format(d, "MMMM d, yyyy")}</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        ); } catch { return null; }
+                      })()}
                       {member.bloodGroup && (
                         <div className="flex gap-3">
                           <div className="w-5 h-5 rounded-full bg-destructive/10 text-destructive flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
@@ -416,14 +420,45 @@ export default function MemberProfile() {
               )}
               
               {/* Family Connections */}
-              {(member.spouseName || (member.childrenNames && member.childrenNames.length > 0)) && (
+              {(member.spouseName || member.spouseId || member.fatherId || member.motherId || (member.childrenNames && member.childrenNames.length > 0)) && (
                 <section>
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">Family Connections</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {member.spouseName && (
+                    {member.fatherId && (() => {
+                      const father = members.find(m => m.id === member.fatherId);
+                      return father ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Father</p>
+                          <Link href={`/members/${father.id}`} className="font-medium text-primary hover:underline">
+                            {father.fullName}
+                          </Link>
+                        </div>
+                      ) : null;
+                    })()}
+                    {member.motherId && (() => {
+                      const mother = members.find(m => m.id === member.motherId);
+                      return mother ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Mother</p>
+                          <Link href={`/members/${mother.id}`} className="font-medium text-primary hover:underline">
+                            {mother.fullName}
+                          </Link>
+                        </div>
+                      ) : null;
+                    })()}
+                    {(member.spouseName || member.spouseId) && (
                       <div>
                         <p className="text-sm text-muted-foreground">Spouse</p>
-                        <p className="font-medium">{member.spouseName}</p>
+                        {member.spouseId ? (() => {
+                          const spouse = members.find(m => m.id === member.spouseId);
+                          return spouse ? (
+                            <Link href={`/members/${spouse.id}`} className="font-medium text-primary hover:underline">
+                              {spouse.fullName}
+                            </Link>
+                          ) : <p className="font-medium">{member.spouseName}</p>;
+                        })() : (
+                          <p className="font-medium">{member.spouseName}</p>
+                        )}
                       </div>
                     )}
                     {member.childrenNames && member.childrenNames.length > 0 && (

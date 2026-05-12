@@ -264,7 +264,7 @@ export default function Import() {
   };
 
   const exportExcel = () => {
-    const formattedData = members.map(m => ({
+    const formattedData = members.map(({ photo: _photo, ...m }) => ({
       ...m,
       childrenNames: m.childrenNames ? m.childrenNames.join(', ') : ''
     }));

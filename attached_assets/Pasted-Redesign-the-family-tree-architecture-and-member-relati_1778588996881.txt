@@ -1,0 +1,82 @@
+Redesign the family tree architecture and member relationship system to support a true hierarchical generational family structure.
+
+Current issue:
+Family members are appearing as separate unrelated profiles even when parent-child relationships exist. The tree should automatically organize members into a proper structured lineage.
+
+Required family tree structure:
+
+- Root Ancestor:
+  - Gandalal Keshav Shah (GK Shah)
+  - Mark as Founder / 1st Generation
+
+- Then display:
+  - His 6 sons
+  - His 2 daughters
+
+- Under each child:
+  - Their children
+  - Then grandchildren
+  - Then next generations recursively
+
+- Total support:
+  - Up to 6 generations
+
+Core Requirements:
+
+1. Add Proper Relationship Data Model
+Add fields:
+- memberId
+- fatherId
+- motherId
+- spouseId
+- generationNumber
+- lineageRootId
+- siblingOrder
+
+2. Tree Logic
+- Automatically nest children under parents
+- Do NOT show members separately if already connected in hierarchy
+- Each member should appear only once in the tree
+- Build recursive parent-child structure
+- Children must visually appear below parents
+- Spouses should appear side-by-side
+- Siblings grouped horizontally
+
+3. Generation System
+- GK Shah = Generation 1
+- Children = Generation 2
+- Grandchildren = Generation 3
+- Continue automatically
+
+4. Visual Tree Design
+- Modern interactive tree
+- Zoom and pan support
+- Mobile responsive
+- Connector lines between parents and children
+- Different colors for generations
+- Family branch grouping
+- Expand/collapse branches
+- Clean spacing between family units
+
+5. Family Member Form Changes
+Add searchable dropdowns:
+- Select Father
+- Select Mother
+- Select Spouse
+
+6. Automatic Structure Building
+When a parent is selected:
+- Child should automatically appear beneath them in tree
+- Generation should auto-calculate
+
+7. Prevent Duplicate Display
+If a member exists inside family hierarchy:
+- Do not render them separately elsewhere in tree
+
+8. Compatibility
+- Migrate existing sample data safely
+- Do not crash if parent fields are missing
+- Handle partial/incomplete family relationships gracefully
+
+9. Final Goal
+The tree should visually resemble a real traditional multi-generation Indian family tree starting from GK Shah and branching generation-by-generation downward in a clean structured format.

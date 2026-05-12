@@ -61,6 +61,11 @@ const formSchema = z.object({
   languagesSpoken: z.string().optional(),
   emergencyContact: z.string().optional(),
   notes: z.string().optional(),
+  fatherId: z.string().optional(),
+  motherId: z.string().optional(),
+  spouseId: z.string().optional(),
+  generationNumber: z.number().optional(),
+  siblingOrder: z.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -108,6 +113,11 @@ export default function MemberForm() {
       languagesSpoken: "",
       emergencyContact: "",
       notes: "",
+      fatherId: "",
+      motherId: "",
+      spouseId: "",
+      generationNumber: undefined,
+      siblingOrder: undefined,
     },
   });
 
@@ -118,6 +128,11 @@ export default function MemberForm() {
         form.reset({
           ...member,
           childrenNamesStr: member.childrenNames?.join(", ") || "",
+          fatherId: member.fatherId || "",
+          motherId: member.motherId || "",
+          spouseId: member.spouseId || "",
+          generationNumber: member.generationNumber,
+          siblingOrder: member.siblingOrder,
         });
         if (member.photo) {
           setPhotoPreview(member.photo);
@@ -125,6 +140,19 @@ export default function MemberForm() {
       }
     }
   }, [isLoaded, isEditing, id, members, form]);
+
+  const fatherId = form.watch("fatherId");
+  useEffect(() => {
+    if (fatherId) {
+      const father = members.find(m => m.id === fatherId);
+      if (father?.generationNumber) {
+        form.setValue("generationNumber", father.generationNumber + 1);
+        const ordinals = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
+        const genNum = father.generationNumber + 1;
+        form.setValue("generation", `${ordinals[genNum - 1] || genNum + 'th'} Generation`);
+      }
+    }
+  }, [fatherId, members, form]);
 
   if (!isLoaded) return null;
 
@@ -173,6 +201,11 @@ export default function MemberForm() {
       ...rest,
       photo: finalPhoto,
       childrenNames: childrenNamesStr ? childrenNamesStr.split(",").map(s => s.trim()).filter(Boolean) : [],
+      fatherId: values.fatherId || undefined,
+      motherId: values.motherId || undefined,
+      spouseId: values.spouseId || undefined,
+      generationNumber: values.generationNumber,
+      siblingOrder: values.siblingOrder,
     };
 
     if (isEditing && id) {
@@ -349,6 +382,99 @@ export default function MemberForm() {
                   </FormItem>
                 )}
               />
+
+              {/* Relationship fields - Father, Mother, Spouse dropdowns */}
+              <div className="md:col-span-2 space-y-4 pt-4 border-t border-border">
+                <h4 className="text-sm font-semibold text-muted-foreground">Family Relationships</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="fatherId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Father</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select father..." /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {members.filter(m => m.id !== id && m.gender !== "Female").map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="motherId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mother</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select mother..." /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {members.filter(m => m.id !== id && m.gender !== "Male").map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="spouseId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Spouse</FormLabel>
+                      <Select onValueChange={(val) => {
+                        field.onChange(val);
+                        // Auto-fill spouseName from selection
+                        const spouse = members.find(m => m.id === val);
+                        if (spouse) form.setValue("spouseName", spouse.fullName);
+                      }} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select spouse..." /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {members.filter(m => m.id !== id).map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                </div>
+                
+                {/* Auto-generate generation number from father */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="generationNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Generation Number</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={1} max={10}
+                          placeholder="e.g. 2"
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormDescription>Auto-filled when father is selected</FormDescription>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="siblingOrder" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Birth Order Among Siblings</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={1}
+                          placeholder="e.g. 1"
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
             </CardContent>
           </Card>
 

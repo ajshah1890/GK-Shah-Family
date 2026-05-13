@@ -2,7 +2,10 @@ import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
-import { Users, UserPlus, FileText, PieChart, Info, MapPin, Download, GitBranch } from "lucide-react";
+import {
+  Users, UserPlus, FileText, PieChart, Info, MapPin,
+  Download, GitBranch, Archive, X,
+} from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -13,6 +16,10 @@ export default function Dashboard() {
   const { members, isLoaded } = useFamilyStore();
   const { canInstall, install } = usePWAInstall();
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+  const [backupDismissed, setBackupDismissed] = useState(false);
+  const [lastBackupAt] = useState<string | null>(() => {
+    try { return localStorage.getItem("gkshah_last_backup_at"); } catch { return null; }
+  });
 
   useNotifications(members);
 
@@ -30,6 +37,14 @@ export default function Dashboard() {
     }
   };
 
+  const daysSinceBackup = useMemo(() => {
+    if (!lastBackupAt) return null;
+    return Math.floor((Date.now() - new Date(lastBackupAt).getTime()) / (1000 * 60 * 60 * 24));
+  }, [lastBackupAt]);
+
+  const showBackupBanner = !backupDismissed && members.length > 5 &&
+    (daysSinceBackup === null || daysSinceBackup > 30);
+
   const { thisMonthAdded, topCity, generationStats, recentMembers } = useMemo(() => {
     const now = new Date();
     let thisMonthCount = 0;
@@ -37,22 +52,19 @@ export default function Dashboard() {
     const genCounts: Record<string, number> = {};
 
     members.forEach(m => {
-      // Added this month
       if (m.addedAt) {
         const addedDate = new Date(m.addedAt);
         if (addedDate.getMonth() === now.getMonth() && addedDate.getFullYear() === now.getFullYear()) {
           thisMonthCount++;
         }
       }
-      
-      // Cities
+
       if (m.city) {
         cityCounts[m.city] = (cityCounts[m.city] || 0) + 1;
       }
-      
-      // Generations
+
       if (m.generation) {
-        let shortGen = m.generation.replace(" Generation", "");
+        const shortGen = m.generation.replace(" Generation", "");
         genCounts[shortGen] = (genCounts[shortGen] || 0) + 1;
       }
     });
@@ -71,19 +83,18 @@ export default function Dashboard() {
       .map(([g, c]) => `${g}: ${c}`)
       .join(", ") || "No generation data";
 
-    // Recent 3 members
     const sortedMembers = [...members].sort((a, b) => {
       if (a.addedAt && b.addedAt) {
         return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
       }
-      return 0; // Fallback to id ordering loosely
+      return 0;
     }).slice(0, 3);
 
-    return { 
-      thisMonthAdded: thisMonthCount, 
+    return {
+      thisMonthAdded: thisMonthCount,
       topCity: topC !== "N/A" ? `${topC} (${maxC})` : topC,
       generationStats: genString,
-      recentMembers: sortedMembers
+      recentMembers: sortedMembers,
     };
   }, [members]);
 
@@ -91,6 +102,38 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+
+      {/* Backup reminder banner */}
+      {showBackupBanner && (
+        <Alert className="bg-orange-50/80 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800/40 text-orange-900 dark:text-orange-400">
+          <Archive className="h-4 w-4 text-orange-600 dark:text-orange-500" />
+          <AlertTitle>Back Up Your Family Archive</AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-2">
+            <span>
+              {daysSinceBackup === null
+                ? "You haven't downloaded a backup yet. Keep your family data safe."
+                : `Last backup was ${daysSinceBackup} day${daysSinceBackup !== 1 ? "s" : ""} ago. Download a fresh backup.`}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/settings">
+                <Button size="sm" variant="outline" className="shrink-0 bg-background gap-2">
+                  <Download className="w-3.5 h-3.5" />
+                  Backup Now
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setBackupDismissed(true)}
+                className="h-8 w-8 p-0 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-950/40"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {canInstall && (
         <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-900 dark:text-amber-400">
           <Download className="h-4 w-4 text-amber-600 dark:text-amber-500" />
@@ -136,28 +179,28 @@ export default function Dashboard() {
       </section>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard 
-          title="Total Members" 
-          value={members.length} 
-          icon={<Users className="w-5 h-5" />} 
+        <StatCard
+          title="Total Members"
+          value={members.length}
+          icon={<Users className="w-5 h-5" />}
           description="Across all branches"
         />
-        <StatCard 
-          title="Added This Month" 
-          value={thisMonthAdded} 
-          icon={<UserPlus className="w-5 h-5 text-green-500" />} 
+        <StatCard
+          title="Added This Month"
+          value={thisMonthAdded}
+          icon={<UserPlus className="w-5 h-5 text-green-500" />}
           description="New additions"
         />
-        <StatCard 
-          title="Top City" 
-          value={topCity.split(' ')[0] || "N/A"} 
-          icon={<MapPin className="w-5 h-5 text-amber-500" />} 
+        <StatCard
+          title="Top City"
+          value={topCity.split(' ')[0] || "N/A"}
+          icon={<MapPin className="w-5 h-5 text-amber-500" />}
           description={topCity}
         />
-        <StatCard 
-          title="Generations" 
-          value={members.some(m => m.generation) ? members.filter(m => m.generation).length : 0} 
-          icon={<GitBranch className="w-5 h-5 text-blue-500" />} 
+        <StatCard
+          title="Generations"
+          value={members.some(m => m.generation) ? members.filter(m => m.generation).length : 0}
+          icon={<GitBranch className="w-5 h-5 text-blue-500" />}
           description={generationStats}
         />
       </div>
@@ -178,8 +221,8 @@ export default function Dashboard() {
               <Link key={member.id} href={`/members/${member.id}`}>
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all cursor-pointer">
                   <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-background shadow-sm bg-muted shrink-0">
-                    {member.photo ? (
-                      <img src={member.photo} alt={member.fullName} className="w-full h-full object-cover" />
+                    {member.photo && !member.photo.startsWith("idb:") ? (
+                      <img src={member.photo} alt={member.fullName} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-serif font-bold">
                         {member.fullName.charAt(0)}
@@ -188,7 +231,9 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold font-serif truncate">{member.fullName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{member.city || member.mainFamilyBranch || "No location details"}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {member.city || member.mainFamilyBranch || "No location details"}
+                    </p>
                   </div>
                 </div>
               </Link>

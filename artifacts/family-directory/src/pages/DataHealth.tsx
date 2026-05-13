@@ -7,6 +7,7 @@ import {
   repairMissingLineageRoots,
 } from "@/lib/familyTree";
 import { detectPotentialDuplicates } from "@/hooks/useFamilyStore";
+import { MergeMembersDialog } from "@/components/MergeMembersDialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,8 +16,10 @@ import {
   ShieldCheck, ShieldAlert, ShieldX, AlertTriangle,
   CheckCircle2, RefreshCw, Download, Users, GitBranch,
   Fingerprint, Calendar, User, ChevronDown, ChevronUp,
+  GitMerge, Tag, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { FamilyMember } from "@/types/family";
 
 type Severity = "critical" | "warning" | "info" | "ok";
 
@@ -31,6 +34,13 @@ interface HealthItem {
   repairLabel?: string;
 }
 
+function ordinalGen(n: number): string {
+  if (n === 1) return "1st Generation";
+  if (n === 2) return "2nd Generation";
+  if (n === 3) return "3rd Generation";
+  return `${n}th Generation`;
+}
+
 function SeverityIcon({ s }: { s: Severity }) {
   if (s === "critical") return <ShieldX className="w-5 h-5 text-red-500 shrink-0" />;
   if (s === "warning")  return <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />;
@@ -39,12 +49,19 @@ function SeverityIcon({ s }: { s: Severity }) {
 }
 
 function SeverityBadge({ s }: { s: Severity }) {
-  const cls = s === "critical" ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400"
-    : s === "warning" ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400"
-    : s === "info" ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400"
+  const cls = s === "critical"
+    ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400"
+    : s === "warning"
+    ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400"
+    : s === "info"
+    ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400"
     : "bg-green-100 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400";
   const label = s === "critical" ? "Critical" : s === "warning" ? "Warning" : s === "info" ? "Info" : "OK";
-  return <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border ${cls}`}>{label}</span>;
+  return (
+    <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border ${cls}`}>
+      {label}
+    </span>
+  );
 }
 
 function HealthCard({ item }: { item: HealthItem }) {
@@ -52,9 +69,9 @@ function HealthCard({ item }: { item: HealthItem }) {
   return (
     <div className={[
       "rounded-lg border p-4 transition-colors",
-      item.severity === "critical" ? "border-red-200 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/50" :
+      item.severity === "critical" ? "border-red-200 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/50"  :
       item.severity === "warning"  ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800/50" :
-      item.severity === "info"     ? "border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800/50" :
+      item.severity === "info"     ? "border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800/50"   :
       "border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-800/50",
     ].join(" ")}>
       <div className="flex items-start justify-between gap-3">
@@ -98,10 +115,11 @@ function HealthCard({ item }: { item: HealthItem }) {
 }
 
 export default function DataHealth() {
-  const { members, isLoaded, importMembers } = useFamilyStore();
+  const { members, isLoaded, importMembers, mergeMember, undoLastAction } = useFamilyStore();
   const { isAdmin } = useAdminMode();
   const [, setLocation] = useLocation();
   const [repairing, setRepairing] = useState<string | null>(null);
+  const [mergePair, setMergePair] = useState<{ memberA: FamilyMember; memberB: FamilyMember } | null>(null);
 
   const report = useMemo(() => runIntegrityCheck(members), [members]);
 
@@ -130,10 +148,39 @@ export default function DataHealth() {
     [members]
   );
 
-  // Duplicate detection: sample check on all members
+  // New checks
+  const noBranchMembers = useMemo(
+    () => members.filter(m => !m.mainFamilyBranch && !m.isArchived),
+    [members]
+  );
+
+  const suspiciousAges = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return members.filter(m => {
+      if (!m.birthday || m.isArchived) return false;
+      const birthYear = new Date(m.birthday).getFullYear();
+      const age = currentYear - birthYear;
+      return birthYear < 1900 || age > 115;
+    });
+  }, [members]);
+
+  const genStringMismatches = useMemo(
+    () => members.filter(m =>
+      m.generationNumber &&
+      m.generation &&
+      m.generation !== ordinalGen(m.generationNumber)
+    ),
+    [members]
+  );
+
+  // Duplicate detection with full member objects
   const duplicatePairs = useMemo(() => {
     const seen = new Set<string>();
-    const pairs: Array<{ a: string; b: string; reasons: string[] }> = [];
+    const pairs: Array<{
+      idA: string; idB: string;
+      nameA: string; nameB: string;
+      reasons: string[];
+    }> = [];
     members.forEach(m => {
       const dupes = detectPotentialDuplicates(
         { fullName: m.fullName, phone: m.phone, birthday: m.birthday },
@@ -144,12 +191,14 @@ export default function DataHealth() {
         const key = [m.id, d.id].sort().join("|");
         if (!seen.has(key)) {
           seen.add(key);
-          pairs.push({ a: m.fullName, b: d.fullName, reasons });
+          pairs.push({ idA: m.id, idB: d.id, nameA: m.fullName, nameB: d.fullName, reasons });
         }
       });
     });
     return pairs;
   }, [members]);
+
+  // Repairs
 
   const repairLineage = () => {
     setRepairing("lineage");
@@ -173,6 +222,35 @@ export default function DataHealth() {
       toast.error("Repair failed");
     }
     setRepairing(null);
+  };
+
+  const fixGenStrings = () => {
+    const fixed = members.map(m => {
+      if (m.generationNumber && m.generation && m.generation !== ordinalGen(m.generationNumber)) {
+        return { ...m, generation: ordinalGen(m.generationNumber), updatedAt: new Date().toISOString() };
+      }
+      return m;
+    });
+    importMembers(fixed);
+    toast.success(`Fixed ${genStringMismatches.length} generation label${genStringMismatches.length !== 1 ? "s" : ""}`);
+  };
+
+  const handleMerge = (winnerId: string, loserId: string, fieldOverrides: Partial<FamilyMember>) => {
+    const result = mergeMember(winnerId, loserId, fieldOverrides);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Members merged successfully", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            undoLastAction();
+            toast.success("Merge undone");
+          },
+        },
+      });
+      setMergePair(null);
+    }
   };
 
   const healthItems: HealthItem[] = [
@@ -222,10 +300,41 @@ export default function DataHealth() {
     {
       id: "duplicates",
       label: "Possible Duplicate Members",
-      description: "Members sharing the same name, phone, or birthday. Review and merge if needed.",
+      description: "Members sharing the same name, phone, or birthday. Use the Merge tool below to consolidate.",
       severity: duplicatePairs.length > 0 ? "warning" : "ok",
       count: duplicatePairs.length,
-      details: duplicatePairs.map(p => `"${p.a}" ↔ "${p.b}" — ${p.reasons.join(", ")}`),
+      details: duplicatePairs.map(p => `"${p.nameA}" ↔ "${p.nameB}" — ${p.reasons.join(", ")}`),
+    },
+    {
+      id: "noBranch",
+      label: "Members Without Family Branch",
+      description: "Members with no mainFamilyBranch assigned. Assign a branch for better organisation.",
+      severity: noBranchMembers.length > members.filter(m => !m.isArchived).length * 0.4 ? "warning" : "info",
+      count: noBranchMembers.length,
+      details: noBranchMembers.slice(0, 20).map(m => `${m.fullName} (${m.memberId ?? m.id})`),
+    },
+    {
+      id: "suspiciousAge",
+      label: "Suspicious Birthdates",
+      description: "Members born before 1900 or with age over 115 years. Verify these dates.",
+      severity: suspiciousAges.length > 0 ? "warning" : "ok",
+      count: suspiciousAges.length,
+      details: suspiciousAges.map(m => {
+        const year = new Date(m.birthday!).getFullYear();
+        return `${m.fullName} — born ${year}`;
+      }),
+    },
+    {
+      id: "genStringMismatch",
+      label: "Generation Label Mismatches",
+      description: "Members where the generation string doesn't match their generation number.",
+      severity: genStringMismatches.length > 0 ? "warning" : "ok",
+      count: genStringMismatches.length,
+      details: genStringMismatches.map(m =>
+        `${m.fullName}: has "${m.generation}", expected "${ordinalGen(m.generationNumber!)}"`
+      ),
+      repair: fixGenStrings,
+      repairLabel: "Fix All Labels",
     },
     {
       id: "missingGen",
@@ -264,7 +373,9 @@ export default function DataHealth() {
       description: "Members soft-deleted but still in storage. Review or permanently remove.",
       severity: archivedMembers.length > 0 ? "info" : "ok",
       count: archivedMembers.length,
-      details: archivedMembers.map(m => `${m.fullName} — archived ${m.archivedAt ? new Date(m.archivedAt).toLocaleDateString() : "date unknown"}`),
+      details: archivedMembers.map(m =>
+        `${m.fullName} — archived ${m.archivedAt ? new Date(m.archivedAt).toLocaleDateString() : "date unknown"}`
+      ),
     },
   ];
 
@@ -273,7 +384,7 @@ export default function DataHealth() {
   const okCount       = healthItems.filter(i => i.severity === "ok").length;
 
   const exportReport = () => {
-    const report = {
+    const exportData = {
       generatedAt: new Date().toISOString(),
       totalMembers: members.length,
       summary: { criticalCount, warningCount, okItems: okCount },
@@ -281,7 +392,7 @@ export default function DataHealth() {
         id: i.id, label: i.label, severity: i.severity, count: i.count, details: i.details,
       })),
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -310,7 +421,7 @@ export default function DataHealth() {
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight">Data Health</h1>
           <p className="text-muted-foreground mt-1">
-            Integrity report for {members.length} members. Run periodic checks to keep lineage data clean.
+            Integrity report for {members.length} members · {healthItems.length} checks.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={exportReport} className="gap-2 shrink-0">
@@ -363,6 +474,54 @@ export default function DataHealth() {
         }
       </div>
 
+      {/* Merge Duplicates section */}
+      {duplicatePairs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-serif flex items-center gap-2">
+              <GitMerge className="w-5 h-5 text-amber-600" />
+              Merge Duplicate Members
+            </CardTitle>
+            <CardDescription>
+              Review each suspected duplicate pair and merge them if they represent the same person.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {duplicatePairs.map((pair, i) => {
+              const memberA = members.find(m => m.id === pair.idA);
+              const memberB = members.find(m => m.id === pair.idB);
+              if (!memberA || !memberB) return null;
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">
+                      {pair.nameA} <span className="text-muted-foreground font-normal">↔</span> {pair.nameB}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {pair.reasons.map((r, j) => (
+                        <Badge key={j} variant="secondary" className="text-[10px]">{r}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setMergePair({ memberA, memberB })}
+                    className="gap-1.5 shrink-0 border-amber-300 hover:bg-amber-50 dark:border-amber-700"
+                  >
+                    <GitMerge className="w-3.5 h-3.5" />
+                    Merge
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick links */}
       <Card>
         <CardHeader>
@@ -378,6 +537,12 @@ export default function DataHealth() {
             <GitBranch className="w-4 h-4" />
             Repair Lineage Roots
           </Button>
+          {genStringMismatches.length > 0 && (
+            <Button variant="outline" size="sm" onClick={fixGenStrings} className="gap-2">
+              <Tag className="w-4 h-4" />
+              Fix Generation Labels ({genStringMismatches.length})
+            </Button>
+          )}
           <Link href="/members">
             <Button variant="outline" size="sm" className="gap-2">
               <Users className="w-4 h-4" />
@@ -392,6 +557,17 @@ export default function DataHealth() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* Merge dialog */}
+      {mergePair && (
+        <MergeMembersDialog
+          open={true}
+          onClose={() => setMergePair(null)}
+          memberA={mergePair.memberA}
+          memberB={mergePair.memberB}
+          onMerge={handleMerge}
+        />
+      )}
     </div>
   );
 }

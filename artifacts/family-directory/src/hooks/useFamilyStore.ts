@@ -5,6 +5,7 @@ import {
   repairMissingLineageRoots,
   wouldCreateCircularAncestry,
 } from '../lib/familyTree';
+import { logAudit, diffMembers } from '../lib/auditLog';
 
 const STORAGE_KEY = 'gkshah_family_members';
 const SCHEMA_VERSION = 2;
@@ -15,6 +16,10 @@ interface StoredData {
   version: number;
   members: FamilyMember[];
 }
+
+// ─── Module-level undo snapshot ───────────────────────────────────────────────
+
+let _undoSnapshot: FamilyMember[] | null = null;
 
 // ─── Lineage root resolution ──────────────────────────────────────────────────
 
@@ -46,7 +51,6 @@ function generateMemberId(gen: number | undefined, seqByGen: Record<number, numb
 function migrateMembers(raw: any[]): FamilyMember[] {
   const allById = new Map(raw.map(m => [m.id, m]));
 
-  // Pre-pass: assign memberIds to any member missing one, sorted by generation+siblingOrder
   const seqByGen: Record<number, number> = {};
   const sorted = [...raw].sort(
     (a, b) =>
@@ -58,7 +62,6 @@ function migrateMembers(raw: any[]): FamilyMember[] {
     if (!m.memberId) {
       newMemberIds[m.id] = generateMemberId(m.generationNumber, seqByGen);
     } else {
-      // Track existing gen sequences so new ones don't collide
       const g = m.generationNumber ?? 0;
       const seq = parseInt(m.memberId.split('-').pop() ?? '0', 10);
       if (!isNaN(seq) && seq > (seqByGen[g] ?? 0)) seqByGen[g] = seq;
@@ -161,6 +164,7 @@ function nextMemberIdForGen(gen: number | undefined, members: FamilyMember[]): s
 export function useFamilyStore() {
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasUndo, setHasUndo] = useState(false);
 
   useEffect(() => {
     const loaded = load();
@@ -177,6 +181,18 @@ export function useFamilyStore() {
   const saveMembers = (next: FamilyMember[]) => {
     setMembers(next);
     save(next);
+  };
+
+  const saveUndoSnapshot = (current: FamilyMember[]) => {
+    _undoSnapshot = [...current];
+    setHasUndo(true);
+  };
+
+  const undoLastAction = () => {
+    if (!_undoSnapshot) return;
+    saveMembers(_undoSnapshot);
+    _undoSnapshot = null;
+    setHasUndo(false);
   };
 
   // ── Validation helpers ──────────────────────────────────────────────────────
@@ -245,6 +261,14 @@ export function useFamilyStore() {
 
     const next = rebuildChildrenArrays([...members, newMember]);
     saveMembers(next);
+
+    logAudit({
+      action: 'create',
+      memberId: id,
+      memberName: member.fullName,
+      timestamp: now,
+    });
+
     return { member: next.find(m => m.id === id)! };
   };
 
@@ -273,32 +297,127 @@ export function useFamilyStore() {
       members.map(m => m.id === id ? updated : m)
     );
     saveMembers(next);
+
+    const changes = diffMembers(existing, updated);
+    if (Object.keys(changes).length > 0) {
+      logAudit({
+        action: 'update',
+        memberId: id,
+        memberName: updated.fullName,
+        timestamp: updated.updatedAt!,
+        changes,
+      });
+    }
+
     return {};
   };
 
   const deleteMember = (id: string) => {
+    saveUndoSnapshot(members);
+    const target = members.find(m => m.id === id);
     const next = rebuildChildrenArrays(members.filter(m => m.id !== id));
     saveMembers(next);
+
+    if (target) {
+      logAudit({
+        action: 'delete',
+        memberId: id,
+        memberName: target.fullName,
+        timestamp: new Date().toISOString(),
+      });
+    }
   };
 
   const archiveMember = (id: string) => {
+    saveUndoSnapshot(members);
     const now = new Date().toISOString();
+    const target = members.find(m => m.id === id);
     const next = members.map(m =>
       m.id === id ? { ...m, isArchived: true, archivedAt: now, updatedAt: now } : m
     );
     saveMembers(next);
+
+    if (target) {
+      logAudit({
+        action: 'archive',
+        memberId: id,
+        memberName: target.fullName,
+        timestamp: now,
+      });
+    }
   };
 
   const unarchiveMember = (id: string) => {
     const now = new Date().toISOString();
+    const target = members.find(m => m.id === id);
     const next = members.map(m =>
       m.id === id ? { ...m, isArchived: false, archivedAt: undefined, updatedAt: now } : m
     );
     saveMembers(next);
+
+    if (target) {
+      logAudit({
+        action: 'unarchive',
+        memberId: id,
+        memberName: target.fullName,
+        timestamp: now,
+      });
+    }
   };
 
   const importMembers = (importedMembers: FamilyMember[]) => {
     saveMembers(migrateMembers(importedMembers as any[]));
+  };
+
+  // ── Merge ───────────────────────────────────────────────────────────────────
+
+  const mergeMember = (
+    winnerId: string,
+    loserId: string,
+    fieldOverrides: Partial<FamilyMember>
+  ): { error?: string } => {
+    const allById = new Map(members.map(m => [m.id, m]));
+    const winner = allById.get(winnerId);
+    const loser  = allById.get(loserId);
+    if (!winner || !loser) return { error: "Member not found" };
+
+    saveUndoSnapshot(members);
+
+    const now = new Date().toISOString();
+
+    const mergedWinner: FamilyMember = {
+      ...winner,
+      ...fieldOverrides,
+      id: winnerId,
+      memberId: winner.memberId,
+      updatedAt: now,
+    };
+
+    const updated = members
+      .filter(m => m.id !== loserId)
+      .map(m => {
+        if (m.id === winnerId) return mergedWinner;
+        let changed = false;
+        const patch: Partial<FamilyMember> = {};
+        if (m.fatherId === loserId) { patch.fatherId = winnerId; changed = true; }
+        if (m.motherId === loserId) { patch.motherId = winnerId; changed = true; }
+        if (m.spouseId === loserId) { patch.spouseId = winnerId; changed = true; }
+        return changed ? { ...m, ...patch, updatedAt: now } : m;
+      });
+
+    const rebuilt = rebuildChildrenArrays(updated);
+    saveMembers(rebuilt);
+
+    logAudit({
+      action: 'merge',
+      memberId: winnerId,
+      memberName: winner.fullName,
+      timestamp: now,
+      note: `Merged with "${loser.fullName}" (${loser.memberId ?? loser.id})`,
+      changes: diffMembers(winner, mergedWinner),
+    });
+
+    return {};
   };
 
   const activeMembers = members.filter(m => !m.isArchived);
@@ -313,6 +432,9 @@ export function useFamilyStore() {
     archiveMember,
     unarchiveMember,
     importMembers,
+    mergeMember,
+    canUndo: hasUndo,
+    undoLastAction,
     validateRelationship,
     detectPotentialDuplicates: (
       candidate: { fullName?: string; phone?: string; birthday?: string },

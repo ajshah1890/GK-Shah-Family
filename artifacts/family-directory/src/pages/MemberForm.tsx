@@ -139,15 +139,45 @@ export default function MemberForm() {
       const member = members.find(m => m.id === id);
       if (member) {
         form.reset({
-          ...member,
-          childrenNamesStr: member.childrenNames?.join(", ") || "",
-          fatherId: member.fatherId || "",
-          motherId: member.motherId || "",
-          spouseId: member.spouseId || "",
+          fullName: member.fullName ?? "",
+          photo: (member.photo && !member.photo.startsWith("idb:")) ? member.photo : "",
+          gender: member.gender,
+          generation: member.generation ?? "",
+          nativePlace: member.nativePlace ?? "",
+          birthday: member.birthday ?? "",
+          anniversary: member.anniversary ?? "",
+          address: member.address ?? "",
+          mapsLink: member.mapsLink ?? "",
+          city: member.city ?? "",
+          country: member.country ?? "",
+          phone: member.phone ?? "",
+          whatsapp: member.whatsapp ?? "",
+          email: member.email ?? "",
+          personalWebsite: member.personalWebsite ?? "",
+          linkedIn: member.linkedIn ?? "",
+          instagram: member.instagram ?? "",
+          profession: member.profession ?? "",
+          company: member.company ?? "",
+          previousCompany: member.previousCompany ?? "",
+          businessName: member.businessName ?? "",
+          education: member.education ?? "",
+          bloodGroup: member.bloodGroup ?? "",
+          mainFamilyBranch: member.mainFamilyBranch ?? "",
+          subFamilyBranch: member.subFamilyBranch ?? "",
+          spouseName: member.spouseName ?? "",
+          childrenNamesStr: member.childrenNames?.join(", ") ?? "",
+          hobbies: member.hobbies ?? "",
+          skills: member.skills ?? "",
+          languagesSpoken: member.languagesSpoken ?? "",
+          emergencyContact: member.emergencyContact ?? "",
+          notes: member.notes ?? "",
+          fatherId: member.fatherId ?? "",
+          motherId: member.motherId ?? "",
+          spouseId: member.spouseId ?? "",
           generationNumber: member.generationNumber,
           siblingOrder: member.siblingOrder,
         });
-        if (member.photo) {
+        if (member.photo && !member.photo.startsWith("idb:")) {
           setPhotoPreview(member.photo);
         }
       }
@@ -167,7 +197,38 @@ export default function MemberForm() {
     }
   }, [fatherId, members, form]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    return (
+      <div className="space-y-6 max-w-3xl mx-auto pb-10 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="w-9 h-9 rounded-md bg-muted" />
+          <div className="h-8 w-48 bg-muted rounded-lg" />
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-5 w-32 bg-muted rounded" />
+          <div className="flex gap-6">
+            <div className="w-32 h-32 rounded-full bg-muted shrink-0" />
+            <div className="flex-1 space-y-3 pt-2">
+              <div className="h-4 w-full bg-muted rounded" />
+              <div className="h-4 w-3/4 bg-muted rounded" />
+              <div className="h-4 w-1/2 bg-muted rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-5 w-40 bg-muted rounded" />
+          <div className="grid grid-cols-2 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="h-3.5 w-20 bg-muted rounded" />
+                <div className="h-10 w-full bg-muted rounded-lg" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -348,7 +409,7 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Gender</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Gender" />
@@ -370,7 +431,7 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Generation</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Generation" />
@@ -381,6 +442,10 @@ export default function MemberForm() {
                               <SelectItem value="2nd Generation">2nd Generation</SelectItem>
                               <SelectItem value="3rd Generation">3rd Generation</SelectItem>
                               <SelectItem value="4th Generation">4th Generation</SelectItem>
+                              <SelectItem value="5th Generation">5th Generation</SelectItem>
+                              <SelectItem value="6th Generation">6th Generation</SelectItem>
+                              <SelectItem value="7th Generation">7th Generation</SelectItem>
+                              <SelectItem value="8th Generation">8th Generation</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -801,7 +866,7 @@ export default function MemberForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Blood Group</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select Blood Group" />

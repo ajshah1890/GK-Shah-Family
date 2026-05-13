@@ -458,58 +458,140 @@ export default function MemberProfile() {
                 </section>
               )}
               
-              {/* Family Connections */}
-              {(member.spouseName || member.spouseId || member.fatherId || member.motherId || (member.childrenNames && member.childrenNames.length > 0)) && (
+              {/* Family Connections — visual photo cards */}
+              {(member.fatherId || member.motherId || member.spouseId || member.spouseName ||
+                (member.childrenIds && member.childrenIds.length > 0) ||
+                (member.childrenNames && member.childrenNames.length > 0)) && (
                 <section>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">Family Connections</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {member.fatherId && (() => {
-                      const father = members.find(m => m.id === member.fatherId);
-                      return father ? (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Father</p>
-                          <Link href={`/members/${father.id}`} className="font-medium text-primary hover:underline">
-                            {father.fullName}
-                          </Link>
-                        </div>
-                      ) : null;
-                    })()}
-                    {member.motherId && (() => {
-                      const mother = members.find(m => m.id === member.motherId);
-                      return mother ? (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Mother</p>
-                          <Link href={`/members/${mother.id}`} className="font-medium text-primary hover:underline">
-                            {mother.fullName}
-                          </Link>
-                        </div>
-                      ) : null;
-                    })()}
-                    {(member.spouseName || member.spouseId) && (
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">Family</h3>
+                  <div className="space-y-5">
+
+                    {/* Parents */}
+                    {(member.fatherId || member.motherId) && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Spouse</p>
-                        {member.spouseId ? (() => {
-                          const spouse = members.find(m => m.id === member.spouseId);
-                          return spouse ? (
-                            <Link href={`/members/${spouse.id}`} className="font-medium text-primary hover:underline">
-                              {spouse.fullName}
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-medium mb-2">Parents</p>
+                        <div className="flex flex-wrap gap-2">
+                          {member.fatherId && (() => {
+                            const p = members.find(m => m.id === member.fatherId);
+                            if (!p) return null;
+                            return (
+                              <Link key="father" href={`/members/${p.id}`} className="group">
+                                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-accent hover:border-accent-foreground/20 transition-all">
+                                  <div className="w-9 h-9 rounded-full overflow-hidden bg-blue-500/10 border border-blue-200/40 dark:border-blue-800/30 shrink-0">
+                                    {p.photo && !p.photo.startsWith("idb:") ? (
+                                      <img src={p.photo} alt={p.fullName} className="w-full h-full object-cover" loading="lazy" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-serif font-bold text-sm">{p.fullName.charAt(0)}</div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm group-hover:text-primary transition-colors leading-tight">{p.fullName}</p>
+                                    <p className="text-[10px] text-muted-foreground">Father</p>
+                                  </div>
+                                </div>
+                              </Link>
+                            );
+                          })()}
+                          {member.motherId && (() => {
+                            const p = members.find(m => m.id === member.motherId);
+                            if (!p) return null;
+                            return (
+                              <Link key="mother" href={`/members/${p.id}`} className="group">
+                                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-accent hover:border-accent-foreground/20 transition-all">
+                                  <div className="w-9 h-9 rounded-full overflow-hidden bg-pink-500/10 border border-pink-200/40 dark:border-pink-800/30 shrink-0">
+                                    {p.photo && !p.photo.startsWith("idb:") ? (
+                                      <img src={p.photo} alt={p.fullName} className="w-full h-full object-cover" loading="lazy" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-pink-600 dark:text-pink-400 font-serif font-bold text-sm">{p.fullName.charAt(0)}</div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm group-hover:text-primary transition-colors leading-tight">{p.fullName}</p>
+                                    <p className="text-[10px] text-muted-foreground">Mother</p>
+                                  </div>
+                                </div>
+                              </Link>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Spouse */}
+                    {(member.spouseId || member.spouseName) && (() => {
+                      const spouse = member.spouseId ? members.find(m => m.id === member.spouseId) : null;
+                      return (
+                        <div>
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-medium mb-2">Spouse</p>
+                          {spouse ? (
+                            <Link href={`/members/${spouse.id}`} className="group inline-flex">
+                              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-rose-200/60 dark:border-rose-800/30 bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40 transition-all">
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-rose-500/10 border border-rose-200/40 shrink-0">
+                                  {spouse.photo && !spouse.photo.startsWith("idb:") ? (
+                                    <img src={spouse.photo} alt={spouse.fullName} className="w-full h-full object-cover" loading="lazy" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-rose-600 font-serif font-bold text-sm">{spouse.fullName.charAt(0)}</div>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm group-hover:text-primary transition-colors leading-tight">{spouse.fullName}</p>
+                                  <p className="text-[10px] text-rose-500 dark:text-rose-400 flex items-center gap-1">
+                                    <Heart className="w-2.5 h-2.5" /> Spouse
+                                  </p>
+                                </div>
+                              </div>
                             </Link>
-                          ) : <p className="font-medium">{member.spouseName}</p>;
-                        })() : (
-                          <p className="font-medium">{member.spouseName}</p>
-                        )}
-                      </div>
-                    )}
-                    {member.childrenNames && member.childrenNames.length > 0 && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Children</p>
-                        <ul className="list-disc list-inside pl-1 mt-1">
-                          {member.childrenNames.map((child, i) => (
-                            <li key={i} className="font-medium">{child}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                          ) : (
+                            <p className="font-medium text-sm">{member.spouseName}</p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Children */}
+                    {(() => {
+                      const childMembers = (member.childrenIds ?? []).flatMap(cid => {
+                        const c = members.find(x => x.id === cid);
+                        return c ? [c] : [];
+                      });
+                      const nameList = member.childrenNames ?? [];
+                      if (childMembers.length === 0 && nameList.length === 0) return null;
+                      return (
+                        <div>
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-medium mb-2">
+                            Children ({childMembers.length > 0 ? childMembers.length : nameList.length})
+                          </p>
+                          {childMembers.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {childMembers.map(child => (
+                                <Link key={child.id} href={`/members/${child.id}`} className="group">
+                                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-accent hover:border-accent-foreground/20 transition-all">
+                                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 border border-border/50 shrink-0">
+                                      {child.photo && !child.photo.startsWith("idb:") ? (
+                                        <img src={child.photo} alt={child.fullName} className="w-full h-full object-cover" loading="lazy" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-primary font-serif font-bold text-sm">{child.fullName.charAt(0)}</div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-sm group-hover:text-primary transition-colors leading-tight">{child.fullName}</p>
+                                      {child.city && <p className="text-[10px] text-muted-foreground">{child.city}</p>}
+                                    </div>
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {nameList.map((cn, i) => (
+                                <span key={i} className="px-2.5 py-1 bg-muted rounded-full text-sm font-medium border border-border/50">{cn}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                   </div>
                 </section>
               )}

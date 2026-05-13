@@ -1,151 +1,90 @@
 import { useState, useRef } from "react";
 import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { useAdminMode } from "@/hooks/useAdminMode";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card, CardContent, CardDescription,
+  CardFooter, CardHeader, CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileSpreadsheet, Upload, Download, ArrowRight, CheckCircle2 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell,
+  TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  FileSpreadsheet, Upload, Download,
+  ArrowRight, CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { FamilyMember } from "@/types/family";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { MEMBER_SCHEMA, IMPORT_ALIAS_MAP, EXPORT_COLUMNS } from "@/lib/memberSchema";
 
-// Mapping hints
-const MAPPING_HINTS: Record<string, keyof FamilyMember> = {
-  'full name': 'fullName',
-  'fullname': 'fullName',
-  'name': 'fullName',
-  'first name': 'fullName',
-  'photo': 'photo',
-  'photo url': 'photo',
-  'gender': 'gender',
-  'generation': 'generation',
-  'birthday': 'birthday',
-  'date of birth': 'birthday',
-  'dob': 'birthday',
-  'anniversary': 'anniversary',
-  'wedding date': 'anniversary',
-  'address': 'address',
-  'maps link': 'mapsLink',
-  'google maps': 'mapsLink',
-  'city': 'city',
-  'country': 'country',
-  'native place': 'nativePlace',
-  'native': 'nativePlace',
-  'hometown': 'nativePlace',
-  'phone': 'phone',
-  'phone number': 'phone',
-  'mobile': 'phone',
-  'whatsapp': 'whatsapp',
-  'whatsapp number': 'whatsapp',
-  'email': 'email',
-  'website': 'personalWebsite',
-  'personal website': 'personalWebsite',
-  'linkedin': 'linkedIn',
-  'instagram': 'instagram',
-  'profession': 'profession',
-  'job': 'profession',
-  'occupation': 'profession',
-  'company': 'company',
-  'current company': 'company',
-  'previous company': 'previousCompany',
-  'business name': 'businessName',
-  'education': 'education',
-  'blood group': 'bloodGroup',
-  'blood': 'bloodGroup',
-  'main branch': 'mainFamilyBranch',
-  'main family branch': 'mainFamilyBranch',
-  'sub branch': 'subFamilyBranch',
-  'sub family branch': 'subFamilyBranch',
-  'spouse': 'spouseName',
-  'spouse name': 'spouseName',
-  'children': 'childrenNames',
-  'children names': 'childrenNames',
-  'hobbies': 'hobbies',
-  'skills': 'skills',
-  'languages': 'languagesSpoken',
-  'languages spoken': 'languagesSpoken',
-  'emergency contact': 'emergencyContact',
-  'notes': 'notes'
-};
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
-const FAMILY_MEMBER_FIELDS: { key: keyof FamilyMember, label: string }[] = [
-  { key: 'fullName', label: 'Full Name (Required)' },
-  { key: 'gender', label: 'Gender' },
-  { key: 'generation', label: 'Generation' },
-  { key: 'birthday', label: 'Birthday' },
-  { key: 'anniversary', label: 'Anniversary' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'whatsapp', label: 'WhatsApp' },
-  { key: 'email', label: 'Email' },
-  { key: 'city', label: 'City' },
-  { key: 'country', label: 'Country' },
-  { key: 'nativePlace', label: 'Native Place' },
-  { key: 'address', label: 'Address' },
-  { key: 'mapsLink', label: 'Maps Link' },
-  { key: 'mainFamilyBranch', label: 'Main Branch' },
-  { key: 'subFamilyBranch', label: 'Sub Branch' },
-  { key: 'spouseName', label: 'Spouse Name' },
-  { key: 'childrenNames', label: 'Children (Comma separated)' },
-  { key: 'profession', label: 'Profession' },
-  { key: 'company', label: 'Company' },
-  { key: 'businessName', label: 'Business Name' },
-  { key: 'education', label: 'Education' },
-  { key: 'bloodGroup', label: 'Blood Group' },
-  { key: 'hobbies', label: 'Hobbies' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'notes', label: 'Notes' },
-];
+function autoMap(rawHeaders: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  rawHeaders.forEach(h => {
+    const key = IMPORT_ALIAS_MAP[h.toLowerCase().trim()];
+    if (key) result[h] = key;
+  });
+  return result;
+}
+
+function buildExportRow(m: FamilyMember): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const { key, label } of EXPORT_COLUMNS) {
+    const val = m[key];
+    if (key === "childrenNames" && Array.isArray(val)) {
+      row[label] = (val as string[]).join(", ");
+    } else if (val !== undefined && val !== null && val !== "") {
+      row[label] = val;
+    } else {
+      row[label] = "";
+    }
+  }
+  return row;
+}
+
+// ─── component ────────────────────────────────────────────────────────────────
 
 export default function Import() {
   const { members, importMembers } = useFamilyStore();
   const { isAdmin } = useAdminMode();
-  
+
   const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<any[][]>([]);
+  const [rows, setRows] = useState<unknown[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [step, setStep] = useState<1 | 2>(1);
   const [fileName, setFileName] = useState("");
-  
+
   const csvFileRef = useRef<HTMLInputElement>(null);
   const excelFileRef = useRef<HTMLInputElement>(null);
 
-  const processHeaders = (rawHeaders: string[]) => {
-    const initialMapping: Record<string, string> = {};
-    rawHeaders.forEach(h => {
-      const lowerH = h.toLowerCase().trim();
-      const match = MAPPING_HINTS[lowerH];
-      if (match) {
-        initialMapping[h] = match;
-      }
-    });
+  const processFile = (rawHeaders: string[], rawRows: unknown[][]) => {
     setHeaders(rawHeaders);
-    setMapping(initialMapping);
+    setMapping(autoMap(rawHeaders));
+    setRows(rawRows);
+    setStep(2);
   };
 
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-
     Papa.parse(file, {
       skipEmptyLines: true,
       complete: (results) => {
-        if (results.data && results.data.length > 0) {
-          const rawHeaders = results.data[0] as string[];
-          const rawRows = results.data.slice(1) as any[][];
-          processHeaders(rawHeaders);
-          setRows(rawRows);
-          setStep(2);
-        } else {
-          toast.error("File appears to be empty");
-        }
+        const data = results.data as string[][];
+        if (data.length < 2) { toast.error("File is empty"); return; }
+        processFile(data[0], data.slice(1));
       },
-      error: (error) => {
-        toast.error(`Error parsing CSV: ${error.message}`);
-      }
+      error: (err) => toast.error(`CSV parse error: ${err.message}`),
     });
   };
 
@@ -153,263 +92,280 @@ export default function Import() {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-        
-        if (data.length > 0) {
-          const rawHeaders = data[0] as string[];
-          const rawRows = data.slice(1);
-          processHeaders(rawHeaders);
-          setRows(rawRows);
-          setStep(2);
-        } else {
-          toast.error("File appears to be empty");
-        }
-      } catch (err) {
-        toast.error("Error parsing Excel file");
+        const wb = XLSX.read(evt.target?.result, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+        if (data.length < 2) { toast.error("File is empty"); return; }
+        processFile(data[0] as string[], data.slice(1) as unknown[][]);
+      } catch {
+        toast.error("Could not read Excel file");
       }
     };
     reader.readAsBinaryString(file);
   };
 
+  const cancelImport = () => {
+    setStep(1); setHeaders([]); setRows([]); setMapping({}); setFileName("");
+    if (csvFileRef.current) csvFileRef.current.value = "";
+    if (excelFileRef.current) excelFileRef.current.value = "";
+  };
+
   const executeImport = () => {
-    // Need at least fullName mapped
-    if (!Object.values(mapping).includes('fullName')) {
-      toast.error("You must map at least one column to 'Full Name'");
+    const nameField = Object.values(mapping).find(v => v === "fullName");
+    if (!nameField) {
+      toast.error("Map at least one column to 'Full Name'");
       return;
     }
 
-    const newMembersList: FamilyMember[] = [];
-    const existingMembers = [...members];
-    let addedCount = 0;
-    let skippedCount = 0;
+    const existingNames = new Set(members.map(m => m.fullName.toLowerCase()));
+    const toAdd: FamilyMember[] = [];
+    let skipped = 0;
 
     rows.forEach(row => {
-      const memberData: any = {
-        id: crypto.randomUUID(),
-        addedAt: new Date().toISOString()
-      };
-
-      let hasName = false;
-
-      headers.forEach((header, index) => {
-        const mappedField = mapping[header];
-        if (mappedField && row[index] !== undefined && row[index] !== "") {
-          if (mappedField === 'fullName') hasName = true;
-          
-          if (mappedField === 'childrenNames') {
-            memberData[mappedField] = String(row[index]).split(',').map(s => s.trim()).filter(Boolean);
-          } else {
-            memberData[mappedField] = String(row[index]).trim();
-          }
+      const arr = row as unknown[];
+      const data: Record<string, unknown> = { id: crypto.randomUUID(), addedAt: new Date().toISOString() };
+      headers.forEach((h, i) => {
+        const field = mapping[h];
+        if (!field || arr[i] === undefined || arr[i] === "") return;
+        if (field === "childrenNames") {
+          data[field] = String(arr[i]).split(",").map(s => s.trim()).filter(Boolean);
+        } else if (field === "generationNumber" || field === "siblingOrder") {
+          data[field] = Number(arr[i]) || undefined;
+        } else {
+          data[field] = String(arr[i]).trim();
         }
       });
 
-      if (hasName) {
-        // Check if member already exists
-        const exists = existingMembers.some(m => m.fullName.toLowerCase() === memberData.fullName.toLowerCase());
-        if (exists) {
-          skippedCount++;
-        } else {
-          newMembersList.push(memberData as FamilyMember);
-          addedCount++;
-        }
-      }
+      if (!data.fullName) return;
+      const name = String(data.fullName).toLowerCase();
+      if (existingNames.has(name)) { skipped++; return; }
+      existingNames.add(name);
+      toAdd.push(data as unknown as FamilyMember);
     });
 
-    if (newMembersList.length > 0) {
-      importMembers([...existingMembers, ...newMembersList]);
+    if (toAdd.length > 0) {
+      importMembers([...members, ...toAdd]);
     }
-
-    toast.success(`Import complete! Added ${addedCount} members. Skipped ${skippedCount} duplicates.`);
-    setStep(1);
-    setHeaders([]);
-    setRows([]);
-    setMapping({});
-    setFileName("");
-    if (csvFileRef.current) csvFileRef.current.value = '';
-    if (excelFileRef.current) excelFileRef.current.value = '';
+    toast.success(`Import complete: ${toAdd.length} added, ${skipped} duplicates skipped`);
+    cancelImport();
   };
 
-  const cancelImport = () => {
-    setStep(1);
-    setHeaders([]);
-    setRows([]);
-    setMapping({});
-    setFileName("");
-    if (csvFileRef.current) csvFileRef.current.value = '';
-    if (excelFileRef.current) excelFileRef.current.value = '';
-  };
+  // ── Export ──────────────────────────────────────────────────────────────────
 
   const exportCSV = () => {
-    const formattedData = members.map(m => ({
-      ...m,
-      childrenNames: m.childrenNames ? m.childrenNames.join(', ') : ''
-    }));
-    const csv = Papa.unparse(formattedData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const data = members.map(buildExportRow);
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `gkshah-directory-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gkshah-directory-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     toast.success("Exported to CSV");
   };
 
   const exportExcel = () => {
-    const formattedData = members.map(({ photo: _photo, ...m }) => ({
-      ...m,
-      childrenNames: m.childrenNames ? m.childrenNames.join(', ') : ''
+    const data = members.map(buildExportRow);
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Auto column widths (rough)
+    const colWidths = EXPORT_COLUMNS.map(({ label }) => ({
+      wch: Math.max(label.length + 2, 14),
     }));
-    const ws = XLSX.utils.json_to_sheet(formattedData);
+    ws["!cols"] = colWidths;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Directory");
-    XLSX.writeFile(wb, `gkshah-directory-${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `gkshah-directory-${new Date().toISOString().split("T")[0]}.xlsx`);
     toast.success("Exported to Excel");
   };
+
+  // ── Access guard ────────────────────────────────────────────────────────────
 
   if (!isAdmin) {
     return (
       <div className="text-center py-20 animate-in fade-in slide-in-from-bottom-4">
         <h2 className="text-2xl font-bold font-serif mb-4">Access Denied</h2>
-        <p className="text-muted-foreground">You need admin access to import or export member data.</p>
+        <p className="text-muted-foreground">Admin login required to import or export data.</p>
       </div>
     );
   }
+
+  // ── UI ──────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       <div>
         <h1 className="text-3xl font-serif font-bold tracking-tight">Data Import & Export</h1>
-        <p className="text-muted-foreground mt-1">Bulk manage family directory data.</p>
+        <p className="text-muted-foreground mt-1">
+          Bulk manage family directory data. Export includes all {EXPORT_COLUMNS.length} fields.
+        </p>
       </div>
 
       {step === 1 ? (
-        <Tabs defaultValue="csv" className="w-full">
+        <Tabs defaultValue="excel" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="csv">Import CSV</TabsTrigger>
             <TabsTrigger value="excel">Import Excel</TabsTrigger>
-            <TabsTrigger value="export">Export Data</TabsTrigger>
+            <TabsTrigger value="csv">Import CSV</TabsTrigger>
+            <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
-          
+
+          {/* ── Excel import ── */}
+          <TabsContent value="excel" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif">Import from Excel (.xlsx)</CardTitle>
+                <CardDescription>
+                  First row must be column headers. Columns are auto-matched to member fields.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border rounded-xl m-6 bg-muted/20">
+                <FileSpreadsheet className="w-12 h-12 text-green-600 mb-4 opacity-60" />
+                <h3 className="text-lg font-medium mb-2">Choose an Excel file</h3>
+                <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
+                  Use the exported template for guaranteed column matching.
+                </p>
+                <input
+                  type="file" accept=".xlsx,.xls" className="hidden"
+                  ref={excelFileRef} onChange={handleExcelUpload}
+                />
+                <Button
+                  onClick={() => excelFileRef.current?.click()}
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Upload className="w-4 h-4" /> Choose Excel File
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── CSV import ── */}
           <TabsContent value="csv" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif">Import from CSV</CardTitle>
-                <CardDescription>Upload a comma-separated values file to import multiple members at once.</CardDescription>
+                <CardDescription>
+                  First row must be column headers. Columns are auto-matched to member fields.
+                </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border rounded-xl m-6 bg-muted/20">
                 <FileSpreadsheet className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Select a CSV File</h3>
+                <h3 className="text-lg font-medium mb-2">Choose a CSV file</h3>
                 <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-                  The first row should contain your column headers. We'll help you map them in the next step.
+                  UTF-8 encoded, comma-separated. First row = headers.
                 </p>
-                <input 
-                  type="file" 
-                  accept=".csv" 
-                  className="hidden" 
-                  ref={csvFileRef} 
-                  onChange={handleCSVUpload} 
+                <input
+                  type="file" accept=".csv" className="hidden"
+                  ref={csvFileRef} onChange={handleCSVUpload}
                 />
                 <Button onClick={() => csvFileRef.current?.click()} className="gap-2">
-                  <Upload className="w-4 h-4" />
-                  Choose CSV File
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="excel" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-serif">Import from Excel</CardTitle>
-                <CardDescription>Upload an .xlsx file. Only the first sheet will be imported.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border rounded-xl m-6 bg-muted/20">
-                <FileSpreadsheet className="w-12 h-12 text-green-600 mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Select an Excel File</h3>
-                <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-                  The first row should contain your column headers. We'll help you map them in the next step.
-                </p>
-                <input 
-                  type="file" 
-                  accept=".xlsx, .xls" 
-                  className="hidden" 
-                  ref={excelFileRef} 
-                  onChange={handleExcelUpload} 
-                />
-                <Button onClick={() => excelFileRef.current?.click()} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
-                  <Upload className="w-4 h-4" />
-                  Choose Excel File
+                  <Upload className="w-4 h-4" /> Choose CSV File
                 </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* ── Export ── */}
           <TabsContent value="export" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif">Export Directory Data</CardTitle>
-                <CardDescription>Download your entire family directory to use in other spreadsheet programs.</CardDescription>
+                <CardDescription>
+                  Downloads all {members.length} members with {EXPORT_COLUMNS.length} fields each.
+                  Photos are excluded (too large for spreadsheets). Relationship IDs are included.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-4">
-                  <Button onClick={exportCSV} variant="outline" className="flex-1 py-8 h-auto gap-3 flex-col">
-                    <Download className="w-6 h-6" />
-                    <span>Download as CSV</span>
-                  </Button>
-                  <Button onClick={exportExcel} variant="outline" className="flex-1 py-8 h-auto gap-3 flex-col text-green-600 border-green-200 hover:bg-green-50">
+                  <Button
+                    onClick={exportExcel}
+                    variant="outline"
+                    className="flex-1 py-8 h-auto gap-3 flex-col text-green-700 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-900 dark:hover:bg-green-950"
+                  >
                     <Download className="w-6 h-6" />
                     <span>Download as Excel</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      Best for editing & re-importing
+                    </span>
                   </Button>
+                  <Button
+                    onClick={exportCSV}
+                    variant="outline"
+                    className="flex-1 py-8 h-auto gap-3 flex-col"
+                  >
+                    <Download className="w-6 h-6" />
+                    <span>Download as CSV</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      Best for sharing / backup
+                    </span>
+                  </Button>
+                </div>
+
+                {/* Column reference */}
+                <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                    Exported columns ({EXPORT_COLUMNS.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {EXPORT_COLUMNS.map(c => (
+                      <span
+                        key={c.key}
+                        className="text-[10px] bg-card border border-border rounded px-1.5 py-0.5 text-muted-foreground"
+                      >
+                        {c.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       ) : (
+        /* ── Column mapping step ── */
         <Card className="animate-in fade-in zoom-in-95">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="font-serif">Map Columns</CardTitle>
-                <CardDescription>File: {fileName} • {rows.length} records found</CardDescription>
+                <CardDescription>
+                  {fileName} · {rows.length} rows ·{" "}
+                  {Object.values(mapping).filter(Boolean).length} of {headers.length} columns auto-matched
+                </CardDescription>
               </div>
               <Button variant="ghost" onClick={cancelImport}>Cancel</Button>
             </div>
           </CardHeader>
+
           <CardContent className="space-y-8">
+            {/* Mapping grid */}
             <div className="bg-muted/30 p-4 rounded-lg border border-border">
-              <h4 className="font-medium mb-4 flex items-center gap-2">
+              <h4 className="font-medium mb-4 flex items-center gap-2 text-sm">
                 <ArrowRight className="w-4 h-4 text-primary" />
-                Match your file's columns to the directory fields
+                Match your file's columns to member fields
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                {headers.map((header) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {headers.map(header => (
                   <div key={header} className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium truncate" title={header}>{header}</label>
-                    <Select 
-                      value={mapping[header] || "skip"} 
-                      onValueChange={(val) => {
-                        setMapping(prev => ({
-                          ...prev,
-                          [header]: val === "skip" ? "" : val
-                        }));
-                      }}
+                    <Select
+                      value={mapping[header] || "skip"}
+                      onValueChange={val =>
+                        setMapping(prev => ({ ...prev, [header]: val === "skip" ? "" : val }))
+                      }
                     >
                       <SelectTrigger className="h-9">
                         <SelectValue placeholder="Skip column" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="skip" className="text-muted-foreground italic">Skip this column</SelectItem>
-                        {FAMILY_MEMBER_FIELDS.map(f => (
+                        <SelectItem value="skip" className="text-muted-foreground italic">
+                          Skip this column
+                        </SelectItem>
+                        {MEMBER_SCHEMA.map(f => (
                           <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -419,30 +375,32 @@ export default function Import() {
               </div>
             </div>
 
+            {/* Preview */}
             <div>
-              <h4 className="font-medium mb-3">Data Preview (First 3 rows)</h4>
+              <h4 className="font-medium mb-3 text-sm">Preview (first 3 rows)</h4>
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {headers.map((header, i) => (
+                      {headers.map((h, i) => (
                         <TableHead key={i} className="whitespace-nowrap">
-                          <div>
-                            <div className="font-bold text-foreground">{header}</div>
-                            <div className="text-xs text-primary font-medium mt-1">
-                              {mapping[header] ? `→ ${mapping[header]}` : <span className="text-muted-foreground italic">Skipped</span>}
-                            </div>
+                          <div className="font-bold text-foreground text-xs">{h}</div>
+                          <div className="text-[10px] text-primary font-medium mt-0.5">
+                            {mapping[h]
+                              ? `→ ${MEMBER_SCHEMA.find(f => f.key === mapping[h])?.label ?? mapping[h]}`
+                              : <span className="text-muted-foreground italic">skipped</span>
+                            }
                           </div>
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.slice(0, 3).map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
-                        {headers.map((_, colIndex) => (
-                          <TableCell key={colIndex} className="max-w-[150px] truncate text-muted-foreground">
-                            {row[colIndex] || '-'}
+                    {rows.slice(0, 3).map((row, ri) => (
+                      <TableRow key={ri}>
+                        {headers.map((_, ci) => (
+                          <TableCell key={ci} className="max-w-[140px] truncate text-xs text-muted-foreground">
+                            {String((row as unknown[])[ci] ?? "-")}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -452,13 +410,14 @@ export default function Import() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between border-t border-border pt-6">
+
+          <CardFooter className="flex justify-between border-t pt-6">
             <p className="text-sm text-muted-foreground">
-              Existing members with the exact same name will be skipped.
+              Existing members with the same name are skipped automatically.
             </p>
             <Button onClick={executeImport} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              Import {rows.length} Members
+              Import {rows.length} Member{rows.length !== 1 ? "s" : ""}
             </Button>
           </CardFooter>
         </Card>

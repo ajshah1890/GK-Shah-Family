@@ -39,6 +39,7 @@ export interface FamilyMember {
   generationNumber?: number;
   siblingOrder?: number;
   lineageRootId?: string;
+  childrenIds?: string[];
 }
 
 export const SAMPLE_MEMBERS: FamilyMember[] = [

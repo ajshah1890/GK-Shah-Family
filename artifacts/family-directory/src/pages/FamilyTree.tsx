@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ZoomIn, ZoomOut, RefreshCw, GitBranch,
-  Search, X, Heart, ChevronsUpDown, ChevronDown, ChevronUp,
+  Search, X, Heart, ChevronsUpDown, ChevronDown, ChevronUp, Layers,
 } from "lucide-react";
 import {
   buildFamilyTree, getSearchState, TreeNode,
@@ -192,6 +192,14 @@ export default function FamilyTree() {
   const expandAll = () => setCollapseRevision(r => ({ all: false, rev: r.rev + 1 }));
   const collapseAll = () => setCollapseRevision(r => ({ all: true, rev: r.rev + 1 }));
 
+  // Generation filter
+  const [maxGenFilter, setMaxGenFilter] = useState<number | null>(null);
+
+  const filteredMembers = useMemo(() => {
+    if (maxGenFilter === null) return members;
+    return members.filter(m => (m.generationNumber ?? 1) <= maxGenFilter);
+  }, [members, maxGenFilter]);
+
   // Search with debounce
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -204,10 +212,10 @@ export default function FamilyTree() {
   const clearSearch = useCallback(() => { setSearchInput(""); setSearchQuery(""); }, []);
   const searching = searchQuery.trim().length > 0;
 
-  const treeRoots = useMemo(() => buildFamilyTree(members), [members]);
+  const treeRoots = useMemo(() => buildFamilyTree(filteredMembers), [filteredMembers]);
   const { matchIds, expandIds } = useMemo(
-    () => getSearchState(searchQuery, members),
-    [searchQuery, members]
+    () => getSearchState(searchQuery, filteredMembers),
+    [searchQuery, filteredMembers]
   );
   const maxGen = useMemo(
     () => Math.max(1, ...members.map(m => m.generationNumber ?? 1)),
@@ -304,6 +312,36 @@ export default function FamilyTree() {
             <ChevronUp className="w-3 h-3" />
             <span className="hidden sm:inline">Collapse all</span>
           </Button>
+        </div>
+
+        {/* Generation filter */}
+        <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5 flex-wrap">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground px-1.5">
+            <Layers className="w-3 h-3" />
+            <span className="hidden sm:inline">Gen</span>
+          </span>
+          {Array.from({ length: Math.min(maxGen, 6) }, (_, i) => i + 1).map(gen => {
+            const c = genColor(gen);
+            const active = maxGenFilter === gen;
+            return (
+              <button
+                key={gen}
+                onClick={() => setMaxGenFilter(active ? null : gen)}
+                className={[
+                  "text-[10px] font-medium px-2 py-0.5 rounded transition-colors border",
+                  active ? `${c.bg} ${c.border} font-semibold ring-1 ${c.border}` : "text-muted-foreground hover:bg-muted border-transparent",
+                ].join(" ")}
+                title={active ? "Clear filter" : `Show up to generation ${gen}`}
+              >
+                {gen}
+              </button>
+            );
+          })}
+          {maxGenFilter !== null && (
+            <button onClick={() => setMaxGenFilter(null)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5" title="Clear filter">
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
 
         {/* Zoom */}

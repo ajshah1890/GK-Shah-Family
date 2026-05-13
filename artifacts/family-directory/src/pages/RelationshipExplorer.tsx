@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { FamilyMember } from "@/types/family";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,9 +134,20 @@ function PathCard({ member, label }: { member: FamilyMember; label?: string }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function RelationshipExplorer() {
+  const search = useSearch();
   const { members, isLoaded } = useFamilyStore();
   const [memberAId, setMemberAId] = useState("");
   const [memberBId, setMemberBId] = useState("");
+
+  // Pre-populate Person A from ?from=<memberId> URL param
+  useEffect(() => {
+    if (!isLoaded || !search) return;
+    const params = new URLSearchParams(search);
+    const fromId = params.get("from");
+    if (fromId && members.some(m => m.id === fromId)) {
+      setMemberAId(fromId);
+    }
+  }, [search, isLoaded, members]);
 
   const memberMap = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Download, Upload, Info, FileSpreadsheet } from "lucide-react";
+import { Download, Upload, Info, FileSpreadsheet, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -127,6 +127,23 @@ export default function Settings() {
       {isAdmin && (
         <Card>
           <CardHeader>
+            <CardTitle className="font-serif">Data Health</CardTitle>
+            <CardDescription>Run integrity checks, detect duplicates, and repair lineage data.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/data-health">
+              <Button className="gap-2" variant="outline">
+                <Shield className="w-4 h-4" />
+                Open Data Health Dashboard
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
             <CardTitle className="font-serif">Admin Access</CardTitle>
             <CardDescription>Change the master password used to manage the directory.</CardDescription>
           </CardHeader>
@@ -192,7 +209,7 @@ export default function Settings() {
       </Card>
       
       <div className="text-center text-sm text-muted-foreground pt-4">
-        <p>G K Shah Family Directory v1.0</p>
+        <p>G K Shah Family Directory v2.0</p>
         <p>Built with care.</p>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight, Hash, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight, Hash, Link as LinkIcon, GitMerge } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import { getAncestryPath, getDescendants } from "@/lib/familyTree";
@@ -84,6 +84,12 @@ export default function MemberProfile() {
           Back to Directory
         </Button>
         <div className="flex items-center gap-2 flex-wrap">
+          <Link href={`/relationships?from=${member.id}`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <GitMerge className="w-4 h-4" />
+              How are we related?
+            </Button>
+          </Link>
           <a href={shareUrl} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" size="sm" className="gap-2">
               <Share2 className="w-4 h-4" />

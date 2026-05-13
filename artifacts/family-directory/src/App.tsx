@@ -14,6 +14,7 @@ import Statistics from "@/pages/Statistics";
 import Settings from "@/pages/Settings";
 import Import from "@/pages/Import";
 import RelationshipExplorer from "@/pages/RelationshipExplorer";
+import DataHealth from "@/pages/DataHealth";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ function Router() {
         <Route path="/import" component={Import} />
         <Route path="/statistics" component={Statistics} />
         <Route path="/settings" component={Settings} />
+        <Route path="/data-health" component={DataHealth} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

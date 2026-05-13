@@ -193,10 +193,9 @@ export default function MemberForm() {
 
   const onSubmit = (values: FormValues) => {
     const { childrenNamesStr, photo, ...rest } = values;
-    
-    // Default avatar if no photo is provided
+
     const finalPhoto = photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(values.fullName)}`;
-    
+
     const memberData = {
       ...rest,
       photo: finalPhoto,
@@ -209,13 +208,21 @@ export default function MemberForm() {
     };
 
     if (isEditing && id) {
-      updateMember(id, memberData);
+      const result = updateMember(id, memberData);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Member updated successfully");
       setLocation(`/members/${id}`);
     } else {
-      const newMember = addMember(memberData);
+      const result = addMember(memberData);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Member added successfully");
-      setLocation(`/members/${newMember.id}`);
+      setLocation(`/members/${result.member.id}`);
     }
   };
 

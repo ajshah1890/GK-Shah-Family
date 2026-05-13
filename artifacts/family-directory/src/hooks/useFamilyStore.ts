@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { FamilyMember, SAMPLE_MEMBERS } from '../types/family';
+import {
+  rebuildChildrenArrays,
+  repairMissingLineageRoots,
+  wouldCreateCircularAncestry,
+} from '../lib/familyTree';
 
 const STORAGE_KEY = 'gkshah_family_members';
+const SCHEMA_VERSION = 2;
+
+// ─── Stored format ────────────────────────────────────────────────────────────
+
+interface StoredData {
+  version: number;
+  members: FamilyMember[];
+}
+
+// ─── Lineage root resolution ──────────────────────────────────────────────────
 
 function resolveLineageRoot(m: any, allById: Map<string, any>): string | undefined {
   const visited = new Set<string>();
@@ -18,129 +33,189 @@ function resolveLineageRoot(m: any, allById: Map<string, any>): string | undefin
   return cur?.id;
 }
 
-function migrateMembers(raw: unknown[]): FamilyMember[] {
-  const allById = new Map((raw as any[]).map(m => [m.id, m]));
-  return (raw as any[]).map((m) => {
-    const migrated = { ...m };
-    // Remove stale fields
-    delete migrated.relationship;
-    // Rename familyBranch -> mainFamilyBranch
+// ─── Migration ────────────────────────────────────────────────────────────────
+
+function migrateMembers(raw: any[]): FamilyMember[] {
+  const allById = new Map(raw.map(m => [m.id, m]));
+
+  const migrated = raw.map((m): FamilyMember => {
+    const out = { ...m };
+    delete out.relationship;
     if (m.familyBranch && !m.mainFamilyBranch) {
-      migrated.mainFamilyBranch = m.familyBranch;
+      out.mainFamilyBranch = m.familyBranch;
     }
-    delete migrated.familyBranch;
-    // Auto-compute lineageRootId if missing
-    if (!migrated.lineageRootId) {
-      migrated.lineageRootId = resolveLineageRoot(m, allById);
+    delete out.familyBranch;
+
+    if (!out.lineageRootId) {
+      out.lineageRootId = resolveLineageRoot(m, allById);
     }
-    // Parse numeric fields that may have come in as strings (e.g. from Excel import)
-    if (migrated.generationNumber !== undefined) {
-      migrated.generationNumber = Number(migrated.generationNumber) || undefined;
+    if (out.generationNumber !== undefined) {
+      const n = Number(out.generationNumber);
+      out.generationNumber = isNaN(n) ? undefined : n;
     }
-    if (migrated.siblingOrder !== undefined) {
-      migrated.siblingOrder = Number(migrated.siblingOrder) || undefined;
+    if (out.siblingOrder !== undefined) {
+      const n = Number(out.siblingOrder);
+      out.siblingOrder = isNaN(n) ? undefined : n;
     }
-    // Normalise childrenNames: may be a comma-string after Excel round-trip
-    if (typeof migrated.childrenNames === 'string') {
-      migrated.childrenNames = (migrated.childrenNames as string)
+    if (typeof out.childrenNames === 'string') {
+      out.childrenNames = out.childrenNames
         .split(',').map((s: string) => s.trim()).filter(Boolean);
     }
-    return migrated as FamilyMember;
+    return out;
   });
+
+  // Ensure childrenIds arrays are consistent
+  return rebuildChildrenArrays(repairMissingLineageRoots(migrated));
 }
+
+function load(): FamilyMember[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Support both old format (plain array) and new format ({ version, members })
+    const members = Array.isArray(parsed) ? parsed : (parsed as StoredData).members;
+    return migrateMembers(members);
+  } catch {
+    return [];
+  }
+}
+
+function save(members: FamilyMember[]) {
+  try {
+    const data: StoredData = { version: SCHEMA_VERSION, members };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage quota exceeded — data remains in memory
+  }
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useFamilyStore() {
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        setMembers(migrateMembers(JSON.parse(data)));
-      } else {
-        setMembers(SAMPLE_MEMBERS);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_MEMBERS));
-      }
-    } catch {
-      setMembers(SAMPLE_MEMBERS);
-    } finally {
-      setIsLoaded(true);
+    const loaded = load();
+    if (loaded.length === 0) {
+      const initial = migrateMembers(SAMPLE_MEMBERS as any[]);
+      setMembers(initial);
+      save(initial);
+    } else {
+      setMembers(loaded);
     }
+    setIsLoaded(true);
   }, []);
 
-  const saveMembers = (newMembers: FamilyMember[]) => {
-    setMembers(newMembers);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newMembers));
-    } catch {
-      // localStorage quota exceeded — silently fail; data is still in memory
-    }
+  const saveMembers = (next: FamilyMember[]) => {
+    setMembers(next);
+    save(next);
   };
 
-  const addMember = (member: Omit<FamilyMember, 'id'>): FamilyMember => {
-    const allById = new Map(members.map(m => [m.id, m]));
-    const tempId = crypto.randomUUID();
+  // ── Validation helpers ──────────────────────────────────────────────────────
 
-    // Auto-compute lineageRootId from parent chain
+  function validateRelationship(
+    memberId: string | undefined,
+    fatherId: string | undefined,
+    motherId: string | undefined,
+    spouseId: string | undefined
+  ): string | null {
+    const id = memberId ?? "__new__";
+    if (fatherId && fatherId === id) return "A member cannot be their own father.";
+    if (motherId && motherId === id) return "A member cannot be their own mother.";
+    if (spouseId && spouseId === id) return "A member cannot be their own spouse.";
+    if (fatherId && spouseId && fatherId === spouseId) return "Father and spouse cannot be the same person.";
+    if (motherId && spouseId && motherId === spouseId) return "Mother and spouse cannot be the same person.";
+    if (id !== "__new__") {
+      if (fatherId && wouldCreateCircularAncestry(id, fatherId, members)) {
+        return "Selecting this father would create a circular ancestry loop.";
+      }
+      if (motherId && wouldCreateCircularAncestry(id, motherId, members)) {
+        return "Selecting this mother would create a circular ancestry loop.";
+      }
+    }
+    return null;
+  }
+
+  // ── CRUD ────────────────────────────────────────────────────────────────────
+
+  const addMember = (member: Omit<FamilyMember, 'id'>): { member: FamilyMember; error?: string } => {
+    const validationError = validateRelationship(
+      undefined, member.fatherId, member.motherId, member.spouseId
+    );
+    if (validationError) return { member: {} as FamilyMember, error: validationError };
+
+    const allById = new Map(members.map(m => [m.id, m]));
+    const id = crypto.randomUUID();
+
     let lineageRootId = member.lineageRootId;
     if (!lineageRootId) {
       const parentId = member.fatherId || member.motherId;
-      if (parentId) {
-        lineageRootId = resolveLineageRoot(allById.get(parentId), allById) ?? parentId;
-      } else {
-        lineageRootId = tempId; // root of its own lineage
-      }
+      lineageRootId = parentId
+        ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
+        : id;
     }
 
-    // Auto-compute generationNumber from parent if not set
     let generationNumber = member.generationNumber;
     if (!generationNumber) {
       const parentId = member.fatherId || member.motherId;
       const parent = parentId ? allById.get(parentId) : undefined;
-      if (parent?.generationNumber) {
-        generationNumber = parent.generationNumber + 1;
-      }
+      if (parent?.generationNumber) generationNumber = parent.generationNumber + 1;
     }
 
     const newMember: FamilyMember = {
       ...member,
-      id: tempId,
+      id,
       lineageRootId,
       generationNumber,
       addedAt: new Date().toISOString(),
     };
-
-    // Update lineageRootId if it was set to tempId (now we have the real id)
-    if (newMember.lineageRootId === tempId) {
-      newMember.lineageRootId = newMember.id;
+    if (newMember.lineageRootId === id && member.fatherId === undefined && member.motherId === undefined) {
+      newMember.lineageRootId = id;
     }
 
-    saveMembers([...members, newMember]);
-    return newMember;
+    const next = rebuildChildrenArrays([...members, newMember]);
+    saveMembers(next);
+    return { member: next.find(m => m.id === id)! };
   };
 
-  const updateMember = (id: string, updates: Partial<FamilyMember>) => {
-    const allById = new Map(members.map(m => [m.id, m]));
-    const updated = { ...allById.get(id), ...updates, id } as FamilyMember;
+  const updateMember = (id: string, updates: Partial<FamilyMember>): { error?: string } => {
+    const validationError = validateRelationship(
+      id, updates.fatherId, updates.motherId, updates.spouseId
+    );
+    if (validationError) return { error: validationError };
 
-    // Re-compute lineageRootId if parent changed
-    if (updates.fatherId !== undefined || updates.motherId !== undefined) {
+    const allById = new Map(members.map(m => [m.id, m]));
+    const existing = allById.get(id);
+    if (!existing) return { error: "Member not found" };
+
+    const updated = { ...existing, ...updates, id } as FamilyMember;
+
+    // Recompute lineageRootId if parent changed
+    const parentChanged =
+      updates.fatherId !== undefined || updates.motherId !== undefined;
+    if (parentChanged) {
       const parentId = updated.fatherId || updated.motherId;
-      if (parentId) {
-        updated.lineageRootId = resolveLineageRoot(allById.get(parentId), allById) ?? parentId;
-      }
+      updated.lineageRootId = parentId
+        ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
+        : id;
     }
 
-    saveMembers(members.map(m => m.id === id ? updated : m));
+    const next = rebuildChildrenArrays(
+      members.map(m => m.id === id ? updated : m)
+    );
+    saveMembers(next);
+    return {};
   };
 
   const deleteMember = (id: string) => {
-    saveMembers(members.filter(m => m.id !== id));
+    const next = rebuildChildrenArrays(members.filter(m => m.id !== id));
+    saveMembers(next);
   };
 
   const importMembers = (importedMembers: FamilyMember[]) => {
-    saveMembers(migrateMembers(importedMembers) as FamilyMember[]);
+    saveMembers(migrateMembers(importedMembers as any[]));
   };
 
   return {
@@ -150,5 +225,6 @@ export function useFamilyStore() {
     updateMember,
     deleteMember,
     importMembers,
+    validateRelationship,
   };
 }

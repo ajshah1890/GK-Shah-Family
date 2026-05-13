@@ -7,12 +7,8 @@ export interface TreeNode {
   depth: number;
 }
 
-/**
- * Builds the full family tree from a flat list of members.
- * Each member appears EXACTLY ONCE. Spouses are attached to
- * their partner's node. Children nest under their parents.
- * Members with no parentage and not placed as a spouse become roots.
- */
+// ─── Core tree builder ────────────────────────────────────────────────────────
+
 export function buildFamilyTree(members: FamilyMember[]): TreeNode[] {
   const memberMap = new Map(members.map(m => [m.id, m]));
   const placed = new Set<string>();
@@ -20,7 +16,6 @@ export function buildFamilyTree(members: FamilyMember[]): TreeNode[] {
   function buildNode(m: FamilyMember, depth: number): TreeNode {
     placed.add(m.id);
 
-    // Resolve spouse: prefer spouseId, fall back to spouseName match
     let spouse: FamilyMember | undefined;
     if (m.spouseId) {
       spouse = memberMap.get(m.spouseId);
@@ -40,7 +35,6 @@ export function buildFamilyTree(members: FamilyMember[]): TreeNode[] {
       [m.id, spouse?.id].filter((id): id is string => !!id)
     );
 
-    // Children: any member whose fatherId or motherId is one of the parent IDs
     const children = members
       .filter(x => {
         if (placed.has(x.id)) return false;
@@ -50,11 +44,9 @@ export function buildFamilyTree(members: FamilyMember[]): TreeNode[] {
       .sort((a, b) => (a.siblingOrder ?? 999) - (b.siblingOrder ?? 999));
 
     const childNodes = children.map(c => buildNode(c, depth + 1));
-
     return { member: m, spouse, children: childNodes, depth };
   }
 
-  // Roots: members with no parentage, sorted by generationNumber then siblingOrder
   const candidateRoots = members
     .filter(m => !m.fatherId && !m.motherId)
     .sort(
@@ -65,27 +57,40 @@ export function buildFamilyTree(members: FamilyMember[]): TreeNode[] {
 
   const roots: TreeNode[] = [];
   for (const r of candidateRoots) {
-    if (placed.has(r.id)) continue; // already placed as a spouse
+    if (placed.has(r.id)) continue;
     roots.push(buildNode(r, 0));
   }
-
   return roots;
 }
 
-/** Returns all direct children of a member (those whose fatherId or motherId matches) */
+// ─── Query helpers ────────────────────────────────────────────────────────────
+
 export function getChildren(memberId: string, members: FamilyMember[]): FamilyMember[] {
-  return members.filter(
-    m => m.fatherId === memberId || m.motherId === memberId
-  ).sort((a, b) => (a.siblingOrder ?? 999) - (b.siblingOrder ?? 999));
+  return members
+    .filter(m => m.fatherId === memberId || m.motherId === memberId)
+    .sort((a, b) => (a.siblingOrder ?? 999) - (b.siblingOrder ?? 999));
 }
 
-/** Returns all ancestors of a member, walking up via fatherId */
+export function getDescendants(memberId: string, members: FamilyMember[]): FamilyMember[] {
+  const visited = new Set<string>();
+  const result: FamilyMember[] = [];
+  function walk(id: string) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    for (const child of getChildren(id, members)) {
+      result.push(child);
+      walk(child.id);
+    }
+  }
+  walk(memberId);
+  return result;
+}
+
 export function getAncestors(memberId: string, members: FamilyMember[]): FamilyMember[] {
   const map = new Map(members.map(m => [m.id, m]));
   const ancestors: FamilyMember[] = [];
   const visited = new Set<string>();
   let current = map.get(memberId);
-
   while (current) {
     if (visited.has(current.id)) break;
     visited.add(current.id);
@@ -93,55 +98,34 @@ export function getAncestors(memberId: string, members: FamilyMember[]): FamilyM
     const mother = current.motherId ? map.get(current.motherId) : undefined;
     if (father) ancestors.push(father);
     if (mother) ancestors.push(mother);
-    current = father; // walk up paternal line
+    current = father;
   }
   return ancestors;
 }
 
-/** Returns all descendants of a member recursively */
-export function getDescendants(memberId: string, members: FamilyMember[]): FamilyMember[] {
-  const visited = new Set<string>();
-  const result: FamilyMember[] = [];
-
-  function walk(id: string) {
-    if (visited.has(id)) return;
-    visited.add(id);
-    const children = getChildren(id, members);
-    for (const child of children) {
-      result.push(child);
-      walk(child.id);
-    }
-  }
-
-  walk(memberId);
-  return result;
-}
-
-/** Calculates the generation number of a member by walking up to root */
-export function calculateGeneration(memberId: string, members: FamilyMember[]): number {
+/** Returns the ordered ancestry path from root ancestor down to (but not including) the given member. */
+export function getAncestryPath(memberId: string, members: FamilyMember[]): FamilyMember[] {
   const map = new Map(members.map(m => [m.id, m]));
+  const path: FamilyMember[] = [];
   const visited = new Set<string>();
-  let gen = 1;
   let current = map.get(memberId);
-
-  while (current?.fatherId || current?.motherId) {
+  while (current) {
     if (visited.has(current.id)) break;
     visited.add(current.id);
     const parentId = current.fatherId || current.motherId;
     if (!parentId) break;
-    current = map.get(parentId);
-    gen++;
-    if (gen > 20) break; // safety cap
+    const parent = map.get(parentId);
+    if (!parent) break;
+    path.unshift(parent);
+    current = parent;
   }
-  return gen;
+  return path;
 }
 
-/** Returns the Set of all ancestor member IDs for a given member */
 export function getAncestorIds(memberId: string, members: FamilyMember[]): Set<string> {
   const map = new Map(members.map(m => [m.id, m]));
   const ids = new Set<string>();
   const visited = new Set<string>();
-
   function walk(id: string) {
     const m = map.get(id);
     if (!m || visited.has(id)) return;
@@ -149,12 +133,29 @@ export function getAncestorIds(memberId: string, members: FamilyMember[]): Set<s
     if (m.fatherId) { ids.add(m.fatherId); walk(m.fatherId); }
     if (m.motherId) { ids.add(m.motherId); walk(m.motherId); }
   }
-
   walk(memberId);
   return ids;
 }
 
-/** Given a search query, returns IDs of matching members and all their ancestors (nodes that must be expanded) */
+export function calculateGeneration(memberId: string, members: FamilyMember[]): number {
+  const map = new Map(members.map(m => [m.id, m]));
+  const visited = new Set<string>();
+  let gen = 1;
+  let current = map.get(memberId);
+  while (current?.fatherId || current?.motherId) {
+    if (visited.has(current.id)) break;
+    visited.add(current.id);
+    const parentId = current.fatherId || current.motherId;
+    if (!parentId) break;
+    current = map.get(parentId);
+    gen++;
+    if (gen > 20) break;
+  }
+  return gen;
+}
+
+// ─── Search helpers ───────────────────────────────────────────────────────────
+
 export function getSearchState(query: string, members: FamilyMember[]): {
   matchIds: Set<string>;
   expandIds: Set<string>;
@@ -164,22 +165,133 @@ export function getSearchState(query: string, members: FamilyMember[]): {
 
   const matchIds = new Set<string>(
     members
-      .filter(m => m.fullName.toLowerCase().includes(q) ||
-                   (m.city || "").toLowerCase().includes(q) ||
-                   (m.mainFamilyBranch || "").toLowerCase().includes(q))
+      .filter(m =>
+        m.fullName.toLowerCase().includes(q) ||
+        (m.city || "").toLowerCase().includes(q) ||
+        (m.mainFamilyBranch || "").toLowerCase().includes(q) ||
+        (m.profession || "").toLowerCase().includes(q)
+      )
       .map(m => m.id)
   );
 
   const expandIds = new Set<string>();
   for (const id of matchIds) {
-    const ancestors = getAncestorIds(id, members);
-    ancestors.forEach(aid => expandIds.add(aid));
+    getAncestorIds(id, members).forEach(aid => expandIds.add(aid));
   }
-
   return { matchIds, expandIds };
 }
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 export function generationLabel(n: number): string {
   return `${ORDINALS[n - 1] ?? `${n}th`} Generation`;
+}
+
+// ─── Data integrity utilities ─────────────────────────────────────────────────
+
+export interface OrphanInfo {
+  member: FamilyMember;
+  missingFatherId?: string;
+  missingMotherId?: string;
+  missingSpouseId?: string;
+}
+
+/** Finds members whose referenced parent/spouse IDs don't exist in the dataset. */
+export function detectOrphans(members: FamilyMember[]): OrphanInfo[] {
+  const ids = new Set(members.map(m => m.id));
+  return members
+    .filter(m =>
+      (m.fatherId && !ids.has(m.fatherId)) ||
+      (m.motherId && !ids.has(m.motherId)) ||
+      (m.spouseId && !ids.has(m.spouseId))
+    )
+    .map(m => ({
+      member: m,
+      missingFatherId: m.fatherId && !ids.has(m.fatherId) ? m.fatherId : undefined,
+      missingMotherId: m.motherId && !ids.has(m.motherId) ? m.motherId : undefined,
+      missingSpouseId: m.spouseId && !ids.has(m.spouseId) ? m.spouseId : undefined,
+    }));
+}
+
+/** Checks if adding parentId as a parent of childId would create a circular ancestry loop. */
+export function wouldCreateCircularAncestry(
+  childId: string,
+  potentialParentId: string,
+  members: FamilyMember[]
+): boolean {
+  // Circular if potentialParent is already a descendant of child
+  const descendantIds = new Set(getDescendants(childId, members).map(m => m.id));
+  return descendantIds.has(potentialParentId) || potentialParentId === childId;
+}
+
+/** Detects members whose ancestry chain contains a cycle. Returns their IDs. */
+export function detectCircularRelationships(members: FamilyMember[]): string[] {
+  const map = new Map(members.map(m => [m.id, m]));
+  const circular: string[] = [];
+
+  function hasCycle(startId: string): boolean {
+    const visited = new Set<string>();
+    let cur = map.get(startId);
+    while (cur) {
+      if (visited.has(cur.id)) return true;
+      visited.add(cur.id);
+      const parentId = cur.fatherId || cur.motherId;
+      if (!parentId) return false;
+      cur = map.get(parentId);
+    }
+    return false;
+  }
+
+  members.forEach(m => { if (hasCycle(m.id)) circular.push(m.id); });
+  return circular;
+}
+
+/** Rebuilds childrenIds arrays from fatherId/motherId references. */
+export function rebuildChildrenArrays(members: FamilyMember[]): FamilyMember[] {
+  const childrenMap: Record<string, string[]> = {};
+  members.forEach(m => {
+    if (m.fatherId) {
+      childrenMap[m.fatherId] = [...(childrenMap[m.fatherId] ?? []), m.id];
+    }
+    if (m.motherId && m.motherId !== m.fatherId) {
+      childrenMap[m.motherId] = [...(childrenMap[m.motherId] ?? []), m.id];
+    }
+  });
+  return members.map(m => ({ ...m, childrenIds: childrenMap[m.id] ?? [] }));
+}
+
+/** Re-computes lineageRootId for all members by walking ancestry chains. */
+export function repairMissingLineageRoots(members: FamilyMember[]): FamilyMember[] {
+  const map = new Map(members.map(m => [m.id, m]));
+
+  function findRoot(m: FamilyMember, visited = new Set<string>()): string {
+    if (visited.has(m.id)) return m.id;
+    visited.add(m.id);
+    const parentId = m.fatherId || m.motherId;
+    if (!parentId) return m.id;
+    const parent = map.get(parentId);
+    if (!parent) return m.id;
+    return findRoot(parent, visited);
+  }
+
+  return members.map(m => ({
+    ...m,
+    lineageRootId: m.lineageRootId ?? findRoot(m),
+  }));
+}
+
+/** Full data integrity report. */
+export interface IntegrityReport {
+  orphans: OrphanInfo[];
+  circularIds: string[];
+  missingLineageCount: number;
+  totalMembers: number;
+}
+
+export function runIntegrityCheck(members: FamilyMember[]): IntegrityReport {
+  return {
+    orphans: detectOrphans(members),
+    circularIds: detectCircularRelationships(members),
+    missingLineageCount: members.filter(m => !m.lineageRootId).length,
+    totalMembers: members.length,
+  };
 }

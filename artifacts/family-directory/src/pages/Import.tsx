@@ -62,6 +62,7 @@ export default function Import() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [step, setStep] = useState<1 | 2>(1);
   const [fileName, setFileName] = useState("");
+  const [duplicateMode, setDuplicateMode] = useState<"skip" | "update">("skip");
 
   const csvFileRef = useRef<HTMLInputElement>(null);
   const excelFileRef = useRef<HTMLInputElement>(null);
@@ -120,9 +121,10 @@ export default function Import() {
       return;
     }
 
-    const existingNames = new Set(members.map(m => m.fullName.toLowerCase()));
+    const existingByName = new Map(members.map(m => [m.fullName.toLowerCase(), m]));
     const toAdd: FamilyMember[] = [];
-    let skipped = 0;
+    const toUpdate: FamilyMember[] = [];
+    const seenNames = new Set<string>();
 
     rows.forEach(row => {
       const arr = row as unknown[];
@@ -140,16 +142,39 @@ export default function Import() {
       });
 
       if (!data.fullName) return;
-      const name = String(data.fullName).toLowerCase();
-      if (existingNames.has(name)) { skipped++; return; }
-      existingNames.add(name);
-      toAdd.push(data as unknown as FamilyMember);
+      const nameLower = String(data.fullName).toLowerCase();
+      if (seenNames.has(nameLower)) return;
+      seenNames.add(nameLower);
+
+      const existing = existingByName.get(nameLower);
+      if (existing) {
+        if (duplicateMode === "update") {
+          toUpdate.push({ ...existing, ...data, id: existing.id, addedAt: existing.addedAt } as unknown as FamilyMember);
+        }
+        // else skip
+      } else {
+        toAdd.push(data as unknown as FamilyMember);
+      }
     });
 
-    if (toAdd.length > 0) {
-      importMembers([...members, ...toAdd]);
-    }
-    toast.success(`Import complete: ${toAdd.length} added, ${skipped} duplicates skipped`);
+    const merged = members.map(m => {
+      const updated = toUpdate.find(u => u.id === m.id);
+      return updated ?? m;
+    });
+
+    importMembers([...merged, ...toAdd]);
+
+    const parts = [];
+    if (toAdd.length > 0) parts.push(`${toAdd.length} added`);
+    if (toUpdate.length > 0) parts.push(`${toUpdate.length} updated`);
+    const skippedCount = rows.filter(r => {
+      const arr = r as unknown[];
+      const idx = headers.indexOf(Object.keys(mapping).find(k => mapping[k] === "fullName") ?? "");
+      return idx >= 0 && arr[idx] && existingByName.has(String(arr[idx]).toLowerCase()) && duplicateMode === "skip";
+    }).length;
+    if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
+
+    toast.success(`Import complete: ${parts.join(", ") || "nothing changed"}`);
     cancelImport();
   };
 
@@ -411,11 +436,38 @@ export default function Import() {
             </div>
           </CardContent>
 
-          <CardFooter className="flex justify-between border-t pt-6">
-            <p className="text-sm text-muted-foreground">
-              Existing members with the same name are skipped automatically.
-            </p>
-            <Button onClick={executeImport} className="gap-2">
+          <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 border-t pt-6">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Duplicates:</span>
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+                <button
+                  onClick={() => setDuplicateMode("skip")}
+                  className={[
+                    "px-3 py-1.5 transition-colors",
+                    duplicateMode === "skip"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "bg-card text-muted-foreground hover:bg-muted",
+                  ].join(" ")}
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={() => setDuplicateMode("update")}
+                  className={[
+                    "px-3 py-1.5 transition-colors",
+                    duplicateMode === "update"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "bg-card text-muted-foreground hover:bg-muted",
+                  ].join(" ")}
+                >
+                  Overwrite
+                </button>
+              </div>
+              <span className="text-xs text-muted-foreground hidden sm:block">
+                {duplicateMode === "skip" ? "Existing members are preserved" : "Existing members will be overwritten"}
+              </span>
+            </div>
+            <Button onClick={executeImport} className="gap-2 shrink-0">
               <CheckCircle2 className="w-4 h-4" />
               Import {rows.length} Member{rows.length !== 1 ? "s" : ""}
             </Button>

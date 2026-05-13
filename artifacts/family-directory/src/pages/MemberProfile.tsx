@@ -4,8 +4,10 @@ import { useParams, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useMemo } from "react";
+import { getAncestryPath, getDescendants } from "@/lib/familyTree";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +27,17 @@ export default function MemberProfile() {
   const { members, deleteMember, isLoaded } = useFamilyStore();
   const { isAdmin } = useAdminMode();
   
+  const ancestryPath = useMemo(
+    () => (id ? getAncestryPath(id, members) : []),
+    [id, members]
+  );
+  const descendants = useMemo(
+    () => (id ? getDescendants(id, members) : []),
+    [id, members]
+  );
+
   if (!isLoaded) return null;
-  
+
   const member = members.find(m => m.id === id);
 
   if (!member) {
@@ -113,6 +124,22 @@ export default function MemberProfile() {
           )}
         </div>
       </div>
+
+      {/* Ancestry Breadcrumb */}
+      {ancestryPath.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap text-sm text-muted-foreground">
+          <GitBranch className="w-3.5 h-3.5 shrink-0" />
+          {ancestryPath.map((ancestor, i) => (
+            <span key={ancestor.id} className="flex items-center gap-1.5">
+              <Link href={`/members/${ancestor.id}`} className="hover:text-foreground hover:underline transition-colors">
+                {ancestor.fullName}
+              </Link>
+              <ChevronRight className="w-3 h-3 shrink-0" />
+            </span>
+          ))}
+          <span className="font-medium text-foreground">{member?.fullName}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column: Photo & Primary Info */}
@@ -472,6 +499,52 @@ export default function MemberProfile() {
                       </div>
                     )}
                   </div>
+                </section>
+              )}
+
+              {/* Family Position */}
+              {(descendants.length > 0 || member.generationNumber) && (
+                <section>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 border-b pb-2">Family Position</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {member.generationNumber && (
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-serif font-bold text-primary">{member.generationNumber}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Generation</p>
+                      </div>
+                    )}
+                    {descendants.length > 0 && (
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-serif font-bold text-primary">{descendants.length}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Descendants</p>
+                      </div>
+                    )}
+                    {ancestryPath.length > 0 && (
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-serif font-bold text-primary">{ancestryPath.length}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Generations up</p>
+                      </div>
+                    )}
+                  </div>
+                  {descendants.length > 0 && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Descendants include:{" "}
+                        {descendants.slice(0, 3).map((d, i) => (
+                          <span key={d.id}>
+                            <Link href={`/members/${d.id}`} className="text-primary hover:underline font-medium">
+                              {d.fullName}
+                            </Link>
+                            {i < Math.min(2, descendants.length - 1) ? ", " : ""}
+                          </span>
+                        ))}
+                        {descendants.length > 3 && (
+                          <span className="text-muted-foreground"> and {descendants.length - 3} more</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </section>
               )}
 

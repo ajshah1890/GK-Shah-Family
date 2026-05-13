@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FamilyMember, SAMPLE_MEMBERS } from '../types/family';
 import {
   rebuildChildrenArrays,
@@ -420,7 +420,7 @@ export function useFamilyStore() {
     return {};
   };
 
-  const activeMembers = members.filter(m => !m.isArchived);
+  const activeMembers = useMemo(() => members.filter(m => !m.isArchived), [members]);
 
   return {
     members,

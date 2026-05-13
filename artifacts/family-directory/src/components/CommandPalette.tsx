@@ -80,7 +80,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [, setLocation] = useLocation();
-  const { members } = useFamilyStore();
+  const { members, isLoaded } = useFamilyStore();
   const { isAdmin } = useAdminMode();
 
   const [recent, setRecent] = useState<string[]>(() => {
@@ -165,8 +165,23 @@ export function CommandPalette() {
             </div>
           </CommandEmpty>
 
+          {/* Loading skeleton */}
+          {!isLoaded && (
+            <CommandGroup heading="Loading directory…">
+              {[1, 2, 3].map(i => (
+                <CommandItem key={i} disabled className="opacity-40 pointer-events-none">
+                  <div className="w-7 h-7 rounded-full bg-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 bg-muted animate-pulse rounded w-28" />
+                    <div className="h-2 bg-muted animate-pulse rounded w-16" />
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
           {/* Navigation */}
-          {visibleActions.length > 0 && (
+          {isLoaded && visibleActions.length > 0 && (
             <CommandGroup heading="Navigation">
               {visibleActions.map(a => (
                 <CommandItem
@@ -182,12 +197,12 @@ export function CommandPalette() {
             </CommandGroup>
           )}
 
-          {visibleActions.length > 0 && filteredMembers.length > 0 && (
+          {isLoaded && visibleActions.length > 0 && filteredMembers.length > 0 && (
             <CommandSeparator />
           )}
 
           {/* Members */}
-          {filteredMembers.length > 0 && (
+          {isLoaded && filteredMembers.length > 0 && (
             <CommandGroup heading={query ? `Members (${filteredMembers.length} match${filteredMembers.length !== 1 ? "es" : ""})` : "Members"}>
               {filteredMembers.map(m => (
                 <CommandItem

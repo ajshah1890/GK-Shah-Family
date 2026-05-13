@@ -33,6 +33,7 @@ export function MemberCard({ member }: MemberCardProps) {
                   src={member.photo} 
                   alt={member.fullName} 
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-3xl font-serif font-bold">

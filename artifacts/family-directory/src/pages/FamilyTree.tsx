@@ -2,6 +2,7 @@ import {
   useState, useMemo, useRef, useEffect,
   memo, useCallback,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { FamilyMember } from "@/types/family";
 import { Link } from "wouter";
@@ -131,46 +132,65 @@ const TreeNodeComponent = memo(function TreeNodeComponent({
         )}
       </div>
 
-      {/* Children */}
-      {isExpanded && (
-        <div className="flex flex-col items-center">
-          <div className="w-px bg-border/60 mt-3" style={{ height: 20 }} />
-          <div className="relative flex items-start" style={{ gap: SIBLING_GAP }}>
-            {node.children.map((child, i) => {
-              const isFirst = i === 0;
-              const isLast = i === node.children.length - 1;
-              const isSingle = node.children.length === 1;
-              return (
-                <div key={child.member.id} className="relative flex flex-col items-center">
-                  {!isSingle && (
-                    <div
-                      className="absolute top-0 h-px bg-border/60 z-0"
-                      style={{
-                        left: isFirst ? "50%" : -SIBLING_GAP / 2,
-                        right: isLast ? "50%" : -SIBLING_GAP / 2,
-                      }}
-                    />
-                  )}
-                  <div className="w-px bg-border/60 z-0" style={{ height: 18 }} />
-                  <TreeNodeComponent
-                    node={child}
-                    matchIds={matchIds}
-                    expandIds={expandIds}
-                    searching={searching}
-                    collapseRevision={collapseRevision}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Children — animated */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            key="children"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="w-px bg-border/60 mt-3" style={{ height: 20 }} />
+              <div className="relative flex items-start" style={{ gap: SIBLING_GAP }}>
+                {node.children.map((child, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === node.children.length - 1;
+                  const isSingle = node.children.length === 1;
+                  return (
+                    <div key={child.member.id} className="relative flex flex-col items-center">
+                      {!isSingle && (
+                        <div
+                          className="absolute top-0 h-px bg-border/60 z-0"
+                          style={{
+                            left: isFirst ? "50%" : -SIBLING_GAP / 2,
+                            right: isLast ? "50%" : -SIBLING_GAP / 2,
+                          }}
+                        />
+                      )}
+                      <div className="w-px bg-border/60 z-0" style={{ height: 18 }} />
+                      <TreeNodeComponent
+                        node={child}
+                        matchIds={matchIds}
+                        expandIds={expandIds}
+                        searching={searching}
+                        collapseRevision={collapseRevision}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {hasChildren && collapsed && (
-        <div className="mt-4 px-2 py-0.5 rounded-full bg-muted border border-border text-[9px] text-muted-foreground font-medium">
-          {node.children.length} {node.children.length === 1 ? "child" : "children"} hidden
-        </div>
-      )}
+      <AnimatePresence>
+        {hasChildren && collapsed && (
+          <motion.div
+            key="collapsed-badge"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.12 }}
+            className="mt-4 px-2 py-0.5 rounded-full bg-muted border border-border text-[9px] text-muted-foreground font-medium"
+          >
+            {node.children.length} {node.children.length === 1 ? "child" : "children"} hidden
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });
@@ -247,7 +267,37 @@ export default function FamilyTree() {
   }, []);
   const reset = useCallback(() => { setZoom(0.75); setPanX(0); setPanY(0); }, []);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return (
+    <div className="flex flex-col gap-3 h-[calc(100vh-80px)]">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
+        <div className="space-y-2">
+          <div className="h-7 w-40 bg-muted animate-pulse rounded" />
+          <div className="h-4 w-56 bg-muted animate-pulse rounded" />
+        </div>
+        <div className="flex gap-1.5">
+          {[1,2,3,4].map(i => <div key={i} className="h-5 w-16 bg-muted animate-pulse rounded-full" />)}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <div className="flex-1 max-w-xs h-8 bg-muted animate-pulse rounded" />
+        <div className="h-8 w-28 bg-muted animate-pulse rounded" />
+        <div className="h-8 w-24 bg-muted animate-pulse rounded" />
+        <div className="h-8 w-24 bg-muted animate-pulse rounded ml-auto" />
+      </div>
+      <div className="flex-1 rounded-xl border border-border bg-muted/10 flex items-center justify-center">
+        <div className="flex gap-12 items-start opacity-30">
+          {[0,1,2].map(i => (
+            <div key={i} className="flex flex-col items-center gap-8">
+              <div className="w-20 h-24 rounded-xl bg-muted animate-pulse" />
+              <div className="flex gap-8">
+                {[0,1].map(j => <div key={j} className="w-16 h-20 rounded-xl bg-muted animate-pulse" />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   const genLabels: Record<number, string> = {
     1: "Founder", 2: "2nd Gen", 3: "3rd Gen",

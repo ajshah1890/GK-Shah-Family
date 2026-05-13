@@ -77,7 +77,7 @@ export default function MemberProfile() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto pb-24 sm:pb-10">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <Button variant="ghost" size="sm" onClick={() => setLocation("/members")} className="gap-2">
           <ArrowLeft className="w-4 h-4" />
@@ -154,7 +154,7 @@ export default function MemberProfile() {
             <div className="absolute top-0 inset-x-0 h-24 bg-primary/10"></div>
             <div className="relative z-10 w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-card shadow-md bg-muted mb-4">
               {member.photo ? (
-                <img src={member.photo} alt={member.fullName} className="w-full h-full object-cover" />
+                <img src={member.photo} alt={member.fullName} className="w-full h-full object-cover" loading="lazy" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-4xl font-serif font-bold">
                   {member.fullName.charAt(0)}
@@ -569,6 +569,40 @@ export default function MemberProfile() {
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Mobile floating action bar */}
+      <div className="fixed bottom-0 left-0 right-0 sm:hidden z-50 bg-card/95 backdrop-blur-md border-t border-border">
+        <div className="flex items-center justify-around px-2 py-1.5 max-w-lg mx-auto">
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => setLocation("/members")}
+            className="flex-col gap-0.5 h-auto py-2 px-3 rounded-xl"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-[9px] font-medium">Back</span>
+          </Button>
+          <Link href={`/relationships?from=${member.id}`}>
+            <Button variant="ghost" size="sm" className="flex-col gap-0.5 h-auto py-2 px-3 rounded-xl">
+              <GitMerge className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Relate</span>
+            </Button>
+          </Link>
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="ghost" size="sm" className="flex-col gap-0.5 h-auto py-2 px-3 rounded-xl">
+              <Share2 className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Share</span>
+            </Button>
+          </a>
+          {isAdmin && (
+            <Link href={`/members/${member.id}/edit`}>
+              <Button variant="ghost" size="sm" className="flex-col gap-0.5 h-auto py-2 px-3 rounded-xl text-primary">
+                <Edit className="w-4 h-4" />
+                <span className="text-[9px] font-medium">Edit</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -181,21 +181,38 @@ export default function MemberForm() {
     );
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("Image must be less than 2MB to save to local storage.");
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setPhotoPreview(base64String);
-        form.setValue("photo", base64String);
+  const compressImage = (file: File, maxDim = 800, quality = 0.82): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas unavailable")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
       };
-      reader.readAsDataURL(file);
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("load failed")); };
+      img.src = objectUrl;
+    });
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      const kb = Math.round(compressed.length * 0.75 / 1024);
+      setPhotoPreview(compressed);
+      form.setValue("photo", compressed);
+      toast.success(`Photo ready — ${kb} KB after compression`);
+    } catch {
+      toast.error("Failed to process image. Please try a different photo.");
     }
   };
 
@@ -306,7 +323,7 @@ export default function MemberForm() {
                       Choose File
                     </Button>
                   )}
-                  <p className="text-[10px] text-muted-foreground text-center max-w-[120px]">Max 2MB. Leave empty for auto-generated avatar.</p>
+                  <p className="text-[10px] text-muted-foreground text-center max-w-[120px]">Auto-compressed to ~200 KB. Leave empty for auto-generated avatar.</p>
                 </div>
 
                 <div className="flex-1 w-full space-y-4">

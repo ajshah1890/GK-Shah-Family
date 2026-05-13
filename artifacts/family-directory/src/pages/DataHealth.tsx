@@ -173,6 +173,26 @@ export default function DataHealth() {
     [members]
   );
 
+  const disconnectedRoots = useMemo(
+    () => members.filter(m =>
+      !m.isArchived &&
+      !m.fatherId && !m.motherId &&
+      (m.generationNumber ?? 1) > 1
+    ),
+    [members]
+  );
+
+  const relationshipConflicts = useMemo(
+    () => members.filter(m =>
+      !m.isArchived && (
+        (m.fatherId && m.fatherId === m.motherId) ||
+        (m.fatherId && m.fatherId === m.spouseId) ||
+        (m.motherId && m.motherId === m.spouseId)
+      )
+    ),
+    [members]
+  );
+
   // Duplicate detection with full member objects
   const duplicatePairs = useMemo(() => {
     const seen = new Set<string>();
@@ -335,6 +355,30 @@ export default function DataHealth() {
       ),
       repair: fixGenStrings,
       repairLabel: "Fix All Labels",
+    },
+    {
+      id: "disconnectedRoots",
+      label: "Disconnected Sub-tree Roots",
+      description: "Members in generation 2+ with no parent links. They become isolated roots in the tree, disconnected from the main lineage.",
+      severity: disconnectedRoots.length > 0 ? "warning" : "ok",
+      count: disconnectedRoots.length,
+      details: disconnectedRoots.map(m =>
+        `${m.fullName} (Gen ${m.generationNumber ?? "?"}) — no father or mother linked`
+      ),
+    },
+    {
+      id: "relationshipConflicts",
+      label: "Relationship Conflicts",
+      description: "Members where the same person appears as both father and mother, or simultaneously as a parent and spouse. These must be manually corrected.",
+      severity: relationshipConflicts.length > 0 ? "critical" : "ok",
+      count: relationshipConflicts.length,
+      details: relationshipConflicts.map(m => {
+        const conflicts: string[] = [];
+        if (m.fatherId && m.fatherId === m.motherId) conflicts.push("same person as father and mother");
+        if (m.fatherId && m.fatherId === m.spouseId) conflicts.push("father is also listed as spouse");
+        if (m.motherId && m.motherId === m.spouseId) conflicts.push("mother is also listed as spouse");
+        return `${m.fullName}: ${conflicts.join("; ")}`;
+      }),
     },
     {
       id: "missingGen",

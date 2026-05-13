@@ -1,0 +1,175 @@
+Perform a final production-quality stabilization, polish, and governance pass for Family Chronicle.
+
+IMPORTANT:
+Do NOT add large new architectural systems or experimental features.
+Do NOT rewrite the genealogy engine, recursive hierarchy renderer, repository abstraction, schema versioning, relationship engine, or import/export system.
+
+Preserve all existing functionality.
+
+MAIN GOAL:
+Refine the platform into a highly polished, reliable, family-ready genealogy application optimized for long-term real-world usage and data integrity.
+
+====================================
+PHASE 1 — DATA GOVERNANCE + SAFETY
+
+1. Build a Duplicate Merge UI
+   Requirements:
+
+- Admin-only
+- Compare two possible duplicate members side-by-side
+- Highlight conflicting fields
+- Allow field-by-field merge selection
+- Preserve relationships safely
+- Rebuild lineage automatically after merge
+- Prevent orphaned references
+- Keep audit trail of merge actions
+
+2. Add Edit History / Audit Log
+   Track:
+
+- member creation
+- updates
+- relationship changes
+- merges
+- archival actions
+
+Show:
+
+- timestamp
+- changed fields
+- previous values
+- updatedBy
+
+3. Add Undo Support
+
+- Undo last destructive action
+- Restore archived member
+- Restore merged member snapshot
+
+====================================
+PHASE 2 — PHOTO SYSTEM FINALIZATION
+
+1. Add a Settings page migration utility:
+   “Migrate Photos to IndexedDB”
+
+Requirements:
+
+- One-click migration
+- Progress indicator
+- Safe retry support
+- Skip already migrated photos
+- Storage usage estimate before/after
+
+2. Improve profile photos:
+
+- image compression
+- thumbnail generation
+- lazy loading
+- fallback initials avatar
+
+====================================
+PHASE 3 — UX + MOBILE POLISH
+
+1. Improve mobile usability:
+
+- smoother touch interactions
+- responsive profile layouts
+- sticky action buttons
+- improved spacing
+- better typography scaling
+
+2. Polish command palette:
+
+- smoother keyboard navigation
+- recent member quick access
+- loading states
+- better empty states
+
+3. Improve family tree UX:
+
+- smooth expand/collapse animations
+- centered zoom controls
+- better branch spacing
+- smoother search highlight focus
+- loading fallback for large trees
+
+====================================
+PHASE 4 — DATA QUALITY TOOLING
+
+1. Expand Data Health dashboard:
+   Add:
+
+- duplicate relationship conflicts
+- members without branches
+- members without generation labels
+- suspicious birthdate gaps
+- disconnected mini-trees
+
+2. Add:
+
+- “Fix Automatically” actions where safe
+- repair preview before applying fixes
+
+====================================
+PHASE 5 — EXPORT / BACKUP HARDENING
+
+1. Add Full Backup Export
+   Include:
+
+- members
+- relationships
+- audit metadata
+- schema version
+- settings
+- photo metadata references
+
+2. Add Backup Restore Preview
+   Before restore:
+
+- show member count
+- schema version
+- conflicts
+- duplicates
+- estimated changes
+
+3. Add Scheduled Reminder Banner:
+   “Download a backup of your family archive”
+
+====================================
+PHASE 6 — PRODUCTION READINESS
+
+1. Ensure:
+
+- zero TypeScript errors
+- clean production build
+- mobile compatibility
+- stable deployment
+- import/export integrity
+- relationship correctness
+
+2. Optimize:
+
+- unnecessary rerenders
+- memory usage
+- localStorage writes
+- large tree responsiveness
+
+3. Preserve:
+
+- PWA functionality
+- schema compatibility
+- recursive hierarchy correctness
+- relationship engine accuracy
+
+====================================
+FINAL OUTPUT
+
+After completion provide:
+
+1. Full architecture summary
+2. Changed files summary
+3. Data integrity assessment
+4. Scalability assessment
+5. Remaining technical debt
+6. Recommended long-term deployment stack
+7. Recommended operational practices for maintaining family data quality

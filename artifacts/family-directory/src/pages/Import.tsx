@@ -390,7 +390,7 @@ export default function Import() {
                         <SelectItem value="skip" className="text-muted-foreground italic">
                           Skip this column
                         </SelectItem>
-                        {MEMBER_SCHEMA.map(f => (
+                        {MEMBER_SCHEMA.filter(f => f.key?.trim()).map(f => (
                           <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
                         ))}
                       </SelectContent>

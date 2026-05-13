@@ -182,7 +182,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Gens" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Gens</SelectItem>
-                      {generations.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      {generations.filter(g => g?.trim()).map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -194,7 +194,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Branches</SelectItem>
-                    {mainBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    {mainBranches.filter(b => b?.trim()).map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -205,7 +205,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Sub Branches" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sub Branches</SelectItem>
-                    {subBranches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    {subBranches.filter(b => b?.trim()).map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -217,7 +217,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Cities" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Cities</SelectItem>
-                      {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {cities.filter(c => c?.trim()).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -227,7 +227,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Countries" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Countries</SelectItem>
-                      {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {countries.filter(c => c?.trim()).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -240,7 +240,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Groups" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Groups</SelectItem>
-                      {bloodGroups.map(bg => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}
+                      {bloodGroups.filter(bg => bg?.trim()).map(bg => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -250,7 +250,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Companies" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Companies</SelectItem>
-                      {companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {companies.filter(c => c?.trim()).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -262,7 +262,7 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All Professions" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Professions</SelectItem>
-                    {professions.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    {professions.filter(p => p?.trim()).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

@@ -516,8 +516,8 @@ export default function MemberForm() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id !== id && m.gender !== "Female").map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          {members.filter(m => m.id?.trim() && m.id !== id && m.gender !== "Female").map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -532,8 +532,8 @@ export default function MemberForm() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id !== id && m.gender !== "Male").map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          {members.filter(m => m.id?.trim() && m.id !== id && m.gender !== "Male").map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -555,8 +555,8 @@ export default function MemberForm() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id !== id).map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
+                          {members.filter(m => m.id?.trim() && m.id !== id).map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

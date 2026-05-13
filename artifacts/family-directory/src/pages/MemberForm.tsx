@@ -409,7 +409,7 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Gender</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || undefined}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Gender" />
@@ -431,7 +431,7 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Generation</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || undefined}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Generation" />
@@ -510,12 +510,12 @@ export default function MemberForm() {
                   <FormField control={form.control} name="fatherId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Father</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select father..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {members.filter(m => m.id !== id && m.gender !== "Female").map(m => (
                             <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
                           ))}
@@ -526,12 +526,12 @@ export default function MemberForm() {
                   <FormField control={form.control} name="motherId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Mother</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select mother..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {members.filter(m => m.id !== id && m.gender !== "Male").map(m => (
                             <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
                           ))}
@@ -543,16 +543,18 @@ export default function MemberForm() {
                     <FormItem>
                       <FormLabel>Spouse</FormLabel>
                       <Select onValueChange={(val) => {
-                        field.onChange(val);
+                        const resolved = val === "__none__" ? "" : val;
+                        field.onChange(resolved);
                         // Auto-fill spouseName from selection
-                        const spouse = members.find(m => m.id === val);
+                        const spouse = members.find(m => m.id === resolved);
                         if (spouse) form.setValue("spouseName", spouse.fullName);
-                      }} value={field.value || ""}>
+                        if (val === "__none__") form.setValue("spouseName", "");
+                      }} value={field.value || "__none__"}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select spouse..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {members.filter(m => m.id !== id).map(m => (
                             <SelectItem key={m.id} value={m.id}>{m.fullName}</SelectItem>
                           ))}
@@ -866,7 +868,7 @@ export default function MemberForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Blood Group</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select Blood Group" />

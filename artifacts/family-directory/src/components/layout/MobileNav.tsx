@@ -1,13 +1,13 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Settings, Network, FileSpreadsheet } from "lucide-react";
+import { LayoutDashboard, Users, Network, GitMerge, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { name: "Home", href: "/", icon: LayoutDashboard },
-  { name: "Members", href: "/members", icon: Users },
-  { name: "Tree", href: "/family-tree", icon: Network },
-  { name: "Import", href: "/import", icon: FileSpreadsheet },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Home",    href: "/",              icon: LayoutDashboard },
+  { name: "Members", href: "/members",        icon: Users },
+  { name: "Tree",    href: "/family-tree",    icon: Network },
+  { name: "Related", href: "/relationships",  icon: GitMerge },
+  { name: "Settings",href: "/settings",       icon: Settings },
 ];
 
 export function MobileNav() {
@@ -23,9 +23,9 @@ export function MobileNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 p-2 min-w-[64px] rounded-md transition-colors",
-                isActive 
-                  ? "text-primary font-medium" 
+                "flex flex-col items-center gap-1 p-2 min-w-[56px] rounded-md transition-colors",
+                isActive
+                  ? "text-primary font-medium"
                   : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
               )}
             >

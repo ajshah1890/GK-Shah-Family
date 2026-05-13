@@ -1,5 +1,6 @@
 export interface FamilyMember {
   id: string;
+  memberId?: string;
   fullName: string;
   photo?: string;
   gender?: "Male" | "Female" | "Other";
@@ -33,6 +34,9 @@ export interface FamilyMember {
   emergencyContact?: string;
   notes?: string;
   addedAt?: string;
+  updatedAt?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
   fatherId?: string;
   motherId?: string;
   spouseId?: string;

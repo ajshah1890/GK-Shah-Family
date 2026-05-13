@@ -33,10 +33,37 @@ function resolveLineageRoot(m: any, allById: Map<string, any>): string | undefin
   return cur?.id;
 }
 
+// ─── memberId generation ──────────────────────────────────────────────────────
+
+function generateMemberId(gen: number | undefined, seqByGen: Record<number, number>): string {
+  const g = gen ?? 0;
+  seqByGen[g] = (seqByGen[g] ?? 0) + 1;
+  return `GK-G${g}-${String(seqByGen[g]).padStart(4, '0')}`;
+}
+
 // ─── Migration ────────────────────────────────────────────────────────────────
 
 function migrateMembers(raw: any[]): FamilyMember[] {
   const allById = new Map(raw.map(m => [m.id, m]));
+
+  // Pre-pass: assign memberIds to any member missing one, sorted by generation+siblingOrder
+  const seqByGen: Record<number, number> = {};
+  const sorted = [...raw].sort(
+    (a, b) =>
+      (a.generationNumber ?? 99) - (b.generationNumber ?? 99) ||
+      (a.siblingOrder ?? 99) - (b.siblingOrder ?? 99)
+  );
+  const newMemberIds: Record<string, string> = {};
+  sorted.forEach(m => {
+    if (!m.memberId) {
+      newMemberIds[m.id] = generateMemberId(m.generationNumber, seqByGen);
+    } else {
+      // Track existing gen sequences so new ones don't collide
+      const g = m.generationNumber ?? 0;
+      const seq = parseInt(m.memberId.split('-').pop() ?? '0', 10);
+      if (!isNaN(seq) && seq > (seqByGen[g] ?? 0)) seqByGen[g] = seq;
+    }
+  });
 
   const migrated = raw.map((m): FamilyMember => {
     const out = { ...m };
@@ -46,9 +73,8 @@ function migrateMembers(raw: any[]): FamilyMember[] {
     }
     delete out.familyBranch;
 
-    if (!out.lineageRootId) {
-      out.lineageRootId = resolveLineageRoot(m, allById);
-    }
+    if (!out.memberId) out.memberId = newMemberIds[m.id];
+    if (!out.lineageRootId) out.lineageRootId = resolveLineageRoot(m, allById);
     if (out.generationNumber !== undefined) {
       const n = Number(out.generationNumber);
       out.generationNumber = isNaN(n) ? undefined : n;
@@ -64,7 +90,6 @@ function migrateMembers(raw: any[]): FamilyMember[] {
     return out;
   });
 
-  // Ensure childrenIds arrays are consistent
   return rebuildChildrenArrays(repairMissingLineageRoots(migrated));
 }
 
@@ -73,7 +98,6 @@ function load(): FamilyMember[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Support both old format (plain array) and new format ({ version, members })
     const members = Array.isArray(parsed) ? parsed : (parsed as StoredData).members;
     return migrateMembers(members);
   } catch {
@@ -88,6 +112,48 @@ function save(members: FamilyMember[]) {
   } catch {
     // localStorage quota exceeded — data remains in memory
   }
+}
+
+// ─── Duplicate detection ──────────────────────────────────────────────────────
+
+export interface DuplicateCandidate {
+  member: FamilyMember;
+  reasons: string[];
+}
+
+export function detectPotentialDuplicates(
+  candidate: { fullName?: string; phone?: string; birthday?: string },
+  existing: FamilyMember[],
+  excludeId?: string
+): DuplicateCandidate[] {
+  const results: DuplicateCandidate[] = [];
+  for (const m of existing) {
+    if (m.id === excludeId) continue;
+    const reasons: string[] = [];
+    if (candidate.fullName && m.fullName.toLowerCase() === candidate.fullName.toLowerCase()) {
+      reasons.push("Same full name");
+    }
+    if (candidate.phone && m.phone && candidate.phone.replace(/\D/g, '') === m.phone.replace(/\D/g, '')) {
+      reasons.push("Same phone number");
+    }
+    if (candidate.birthday && m.birthday && candidate.birthday === m.birthday && reasons.length > 0) {
+      reasons.push("Same birthday");
+    }
+    if (reasons.length > 0) results.push({ member: m, reasons });
+  }
+  return results;
+}
+
+// ─── Next memberId for a given generation ─────────────────────────────────────
+
+function nextMemberIdForGen(gen: number | undefined, members: FamilyMember[]): string {
+  const g = gen ?? 0;
+  const existing = members
+    .filter(m => m.memberId?.startsWith(`GK-G${g}-`))
+    .map(m => parseInt(m.memberId!.split('-').pop() ?? '0', 10))
+    .filter(n => !isNaN(n));
+  const max = existing.length > 0 ? Math.max(...existing) : 0;
+  return `GK-G${g}-${String(max + 1).padStart(4, '0')}`;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -164,16 +230,18 @@ export function useFamilyStore() {
       if (parent?.generationNumber) generationNumber = parent.generationNumber + 1;
     }
 
+    const memberId = member.memberId || nextMemberIdForGen(generationNumber, members);
+    const now = new Date().toISOString();
+
     const newMember: FamilyMember = {
       ...member,
       id,
+      memberId,
       lineageRootId,
       generationNumber,
-      addedAt: new Date().toISOString(),
+      addedAt: now,
+      updatedAt: now,
     };
-    if (newMember.lineageRootId === id && member.fatherId === undefined && member.motherId === undefined) {
-      newMember.lineageRootId = id;
-    }
 
     const next = rebuildChildrenArrays([...members, newMember]);
     saveMembers(next);
@@ -190,9 +258,8 @@ export function useFamilyStore() {
     const existing = allById.get(id);
     if (!existing) return { error: "Member not found" };
 
-    const updated = { ...existing, ...updates, id } as FamilyMember;
+    const updated = { ...existing, ...updates, id, updatedAt: new Date().toISOString() } as FamilyMember;
 
-    // Recompute lineageRootId if parent changed
     const parentChanged =
       updates.fatherId !== undefined || updates.motherId !== undefined;
     if (parentChanged) {
@@ -214,17 +281,42 @@ export function useFamilyStore() {
     saveMembers(next);
   };
 
+  const archiveMember = (id: string) => {
+    const now = new Date().toISOString();
+    const next = members.map(m =>
+      m.id === id ? { ...m, isArchived: true, archivedAt: now, updatedAt: now } : m
+    );
+    saveMembers(next);
+  };
+
+  const unarchiveMember = (id: string) => {
+    const now = new Date().toISOString();
+    const next = members.map(m =>
+      m.id === id ? { ...m, isArchived: false, archivedAt: undefined, updatedAt: now } : m
+    );
+    saveMembers(next);
+  };
+
   const importMembers = (importedMembers: FamilyMember[]) => {
     saveMembers(migrateMembers(importedMembers as any[]));
   };
 
+  const activeMembers = members.filter(m => !m.isArchived);
+
   return {
     members,
+    activeMembers,
     isLoaded,
     addMember,
     updateMember,
     deleteMember,
+    archiveMember,
+    unarchiveMember,
     importMembers,
     validateRelationship,
+    detectPotentialDuplicates: (
+      candidate: { fullName?: string; phone?: string; birthday?: string },
+      excludeId?: string
+    ) => detectPotentialDuplicates(candidate, members, excludeId),
   };
 }

@@ -19,6 +19,8 @@ export interface FieldDef {
 }
 
 export const MEMBER_SCHEMA: FieldDef[] = [
+  // ── Identity ───────────────────────────────────────────────────────────────
+  { key: "memberId",         label: "Member ID",              aliases: ["member id", "memberid", "gk id"] },
   // ── Basic ──────────────────────────────────────────────────────────────────
   { key: "fullName",         label: "Full Name",              aliases: ["full name", "fullname", "name", "first name"] },
   { key: "gender",           label: "Gender",                 aliases: ["gender", "sex"] },

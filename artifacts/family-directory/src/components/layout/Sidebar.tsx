@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Settings, Network, FileSpreadsheet, Lock } from "lucide-react";
+import { LayoutDashboard, Users, Settings, Network, FileSpreadsheet, Lock, GitMerge, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,11 +9,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const navItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Members", href: "/members", icon: Users },
-  { name: "Family Tree", href: "/family-tree", icon: Network },
-  { name: "Import", href: "/import", icon: FileSpreadsheet },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Dashboard",      href: "/",              icon: LayoutDashboard },
+  { name: "Members",        href: "/members",        icon: Users },
+  { name: "Family Tree",    href: "/family-tree",    icon: Network },
+  { name: "Relationships",  href: "/relationships",  icon: GitMerge },
+  { name: "Statistics",     href: "/statistics",     icon: BarChart2 },
+  { name: "Import",         href: "/import",         icon: FileSpreadsheet },
+  { name: "Settings",       href: "/settings",       icon: Settings },
 ];
 
 export function Sidebar() {
@@ -43,8 +45,8 @@ export function Sidebar() {
           G K Shah <br /> Directory
         </h1>
       </div>
-      
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           return (
@@ -52,13 +54,13 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-md transition-colors",
-                isActive 
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium" 
+                "flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors text-sm",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <item.icon className="w-5 h-5" />
+              <item.icon className="w-4 h-4 shrink-0" />
               {item.name}
             </Link>
           );
@@ -69,20 +71,17 @@ export function Sidebar() {
         {isAdmin ? (
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 text-primary font-medium">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <div className="w-2 h-2 rounded-full bg-green-500" />
               Admin Mode ON
             </div>
-            <Button variant="ghost" size="sm" onClick={() => {
-              logout();
-              toast.info("Admin mode disabled");
-            }}>
+            <Button variant="ghost" size="sm" onClick={() => { logout(); toast.info("Admin mode disabled"); }}>
               Logout
             </Button>
           </div>
         ) : (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+              <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sm">
                 <Lock className="w-4 h-4" />
                 Admin Login
               </Button>
@@ -92,15 +91,13 @@ export function Sidebar() {
                 <DialogTitle>Admin Login</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleLogin} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Input 
-                    type="password" 
-                    placeholder="Enter admin password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoFocus
-                  />
-                </div>
+                <Input
+                  type="password"
+                  placeholder="Enter admin password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoFocus
+                />
                 <div className="flex justify-end">
                   <Button type="submit">Login</Button>
                 </div>

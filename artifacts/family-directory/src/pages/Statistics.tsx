@@ -1,27 +1,36 @@
 import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Legend 
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
 } from "recharts";
 import { useMemo } from "react";
+import { Link } from "wouter";
+import { computeGenealogyInsights } from "@/lib/relationships";
+import { Globe, MapPin, Users, GitBranch, TrendingUp, ArrowRight } from "lucide-react";
+
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 export default function Statistics() {
   const { members, isLoaded } = useFamilyStore();
 
   const cityData = useMemo(() => {
     const counts: Record<string, number> = {};
-    members.forEach(m => {
-      if (m.city) counts[m.city] = (counts[m.city] || 0) + 1;
-    });
+    members.forEach(m => { if (m.city) counts[m.city] = (counts[m.city] || 0) + 1; });
     return Object.entries(counts)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
@@ -30,27 +39,28 @@ export default function Statistics() {
 
   const branchData = useMemo(() => {
     const counts: Record<string, number> = {};
-    members.forEach(m => {
-      if (m.mainFamilyBranch) counts[m.mainFamilyBranch] = (counts[m.mainFamilyBranch] || 0) + 1;
-    });
+    members.forEach(m => { if (m.mainFamilyBranch) counts[m.mainFamilyBranch] = (counts[m.mainFamilyBranch] || 0) + 1; });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [members]);
 
   const bloodGroupData = useMemo(() => {
     const counts: Record<string, number> = {};
-    members.forEach(m => {
-      if (m.bloodGroup) counts[m.bloodGroup] = (counts[m.bloodGroup] || 0) + 1;
-    });
+    members.forEach(m => { if (m.bloodGroup) counts[m.bloodGroup] = (counts[m.bloodGroup] || 0) + 1; });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [members]);
 
-  const COLORS = [
-    'hsl(var(--chart-1))', 
-    'hsl(var(--chart-2))', 
-    'hsl(var(--chart-3))', 
-    'hsl(var(--chart-4))', 
-    'hsl(var(--chart-5))'
-  ];
+  const genData = useMemo(() => {
+    const counts: Record<number, number> = {};
+    members.forEach(m => {
+      const g = m.generationNumber ?? 0;
+      if (g > 0) counts[g] = (counts[g] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([gen, value]) => ({ name: `Gen ${gen}`, value }))
+      .sort((a, b) => parseInt(a.name.split(" ")[1]) - parseInt(b.name.split(" ")[1]));
+  }, [members]);
+
+  const insights = useMemo(() => computeGenealogyInsights(members), [members]);
 
   if (!isLoaded) return null;
 
@@ -64,84 +74,212 @@ export default function Statistics() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       <div>
         <h1 className="text-3xl font-serif font-bold tracking-tight">Family Insights</h1>
-        <p className="text-muted-foreground mt-1">Demographics and distribution of the family network.</p>
+        <p className="text-muted-foreground mt-1">Demographics and genealogy analytics for {members.length} members.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-serif">Geographic Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    cursor={{fill: 'hsl(var(--accent))'}}
-                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── Genealogy Insight Metrics ── */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-serif font-semibold">Genealogy Snapshot</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-serif font-bold">{members.length}</p>
+                <p className="text-xs text-muted-foreground">Total Members</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <GitBranch className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-serif font-bold">{Object.keys(insights.generationCounts).filter(g => Number(g) > 0).length}</p>
+                <p className="text-xs text-muted-foreground">Generations</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                <Globe className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-serif font-bold">{insights.countrySpread}</p>
+                <p className="text-xs text-muted-foreground">Countries</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-serif font-bold">{insights.citySpread}</p>
+                <p className="text-xs text-muted-foreground">Cities</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-serif">Main Family Branches</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={branchData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {branchData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Longest lineage chain */}
+          {insights.longestChain.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-base flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Longest Lineage Chain ({insights.longestChain.length} generations)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {insights.longestChain.members.map((m, i) => (
+                    <span key={m.id} className="flex items-center gap-1.5">
+                      <Link href={`/members/${m.id}`} className="text-sm font-medium hover:text-primary hover:underline transition-colors">
+                        {m.fullName.split(" ")[0]}
+                      </Link>
+                      {i < insights.longestChain.members.length - 1 && (
+                        <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Root: {insights.longestChain.members[0]?.fullName} → Deepest: {insights.longestChain.members[insights.longestChain.members.length - 1]?.fullName}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-serif">Blood Groups</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bloodGroupData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    cursor={{fill: 'hsl(var(--accent))'}}
-                    contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Bar dataKey="value" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Largest sibling group */}
+          {insights.largestSiblingGroup.count > 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-base flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
+                  Largest Sibling Group ({insights.largestSiblingGroup.count} children)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {insights.largestSiblingGroup.parent && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Children of{" "}
+                    <Link href={`/members/${insights.largestSiblingGroup.parent.id}`} className="font-medium text-foreground hover:text-primary hover:underline transition-colors">
+                      {insights.largestSiblingGroup.parent.fullName}
+                    </Link>
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {insights.largestSiblingGroup.children.slice(0, 8).map(child => (
+                    <Link key={child.id} href={`/members/${child.id}`}>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted border border-border hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                        {child.fullName.split(" ")[0]}
+                      </span>
+                    </Link>
+                  ))}
+                  {insights.largestSiblingGroup.children.length > 8 && (
+                    <span className="text-xs text-muted-foreground">+{insights.largestSiblingGroup.children.length - 8} more</span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </section>
+
+      {/* ── Charts ── */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-serif font-semibold">Demographics</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Geographic Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Top Cities</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={cityData} margin={{ top: 16, right: 16, left: 0, bottom: 4 }}>
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} width={28} />
+                    <Tooltip cursor={{ fill: "hsl(var(--accent))" }} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Members" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Generation breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Members per Generation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={genData} margin={{ top: 16, right: 16, left: 0, bottom: 4 }}>
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} width={28} />
+                    <Tooltip cursor={{ fill: "hsl(var(--accent))" }} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Members" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Family Branches */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Main Family Branches</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={branchData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={4} dataKey="value">
+                      {branchData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
+                    <Legend iconType="circle" iconSize={8} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Blood Groups */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Blood Groups</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={bloodGroupData} margin={{ top: 16, right: 16, left: 0, bottom: 4 }}>
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} width={28} />
+                    <Tooltip cursor={{ fill: "hsl(var(--accent))" }} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} name="Members" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }

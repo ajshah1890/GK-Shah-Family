@@ -4,7 +4,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight, Hash, Link as LinkIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import { getAncestryPath, getDescendants } from "@/lib/familyTree";
@@ -24,7 +24,7 @@ import { toast } from "sonner";
 export default function MemberProfile() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
-  const { members, deleteMember, isLoaded } = useFamilyStore();
+  const { members, deleteMember, isLoaded, archiveMember } = useFamilyStore();
   const { isAdmin } = useAdminMode();
   
   const ancestryPath = useMemo(
@@ -156,7 +156,13 @@ export default function MemberProfile() {
               )}
             </div>
             <h1 className="text-2xl font-serif font-bold text-foreground mb-1">{member.fullName}</h1>
-            {member.gender && <p className="text-sm text-muted-foreground mb-4">{member.gender}</p>}
+            {member.gender && <p className="text-sm text-muted-foreground">{member.gender}</p>}
+            {member.memberId && (
+              <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/70 mt-1 mb-3">
+                <Hash className="w-2.5 h-2.5" />
+                {member.memberId}
+              </div>
+            )}
             
             <div className="flex flex-col items-center gap-2 mb-6">
               {member.mainFamilyBranch && (

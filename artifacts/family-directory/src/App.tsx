@@ -13,6 +13,7 @@ import FamilyTree from "@/pages/FamilyTree";
 import Statistics from "@/pages/Statistics";
 import Settings from "@/pages/Settings";
 import Import from "@/pages/Import";
+import RelationshipExplorer from "@/pages/RelationshipExplorer";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/members/:id/edit" component={MemberForm} />
         <Route path="/members/:id" component={MemberProfile} />
         <Route path="/family-tree" component={FamilyTree} />
+        <Route path="/relationships" component={RelationshipExplorer} />
         <Route path="/import" component={Import} />
         <Route path="/statistics" component={Statistics} />
         <Route path="/settings" component={Settings} />

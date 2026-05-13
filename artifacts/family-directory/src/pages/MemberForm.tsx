@@ -23,10 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { ArrowLeft, Upload, X, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useAdminMode } from "@/hooks/useAdminMode";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { FamilyMember } from "@/types/family";
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -74,9 +85,11 @@ export default function MemberForm() {
   const { id } = useParams();
   const isEditing = id !== "new" && !!id;
   const [, setLocation] = useLocation();
-  const { members, addMember, updateMember, isLoaded } = useFamilyStore();
+  const { members, addMember, updateMember, isLoaded, detectPotentialDuplicates } = useFamilyStore();
   const { isAdmin } = useAdminMode();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [duplicatesFound, setDuplicatesFound] = useState<{ member: FamilyMember; reasons: string[] }[]>([]);
+  const [pendingData, setPendingData] = useState<Omit<FamilyMember, 'id'> | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -191,12 +204,10 @@ export default function MemberForm() {
     form.setValue("photo", "");
   };
 
-  const onSubmit = (values: FormValues) => {
+  const buildMemberData = (values: FormValues) => {
     const { childrenNamesStr, photo, ...rest } = values;
-
     const finalPhoto = photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(values.fullName)}`;
-
-    const memberData = {
+    return {
       ...rest,
       photo: finalPhoto,
       childrenNames: childrenNamesStr ? childrenNamesStr.split(",").map(s => s.trim()).filter(Boolean) : [],
@@ -206,24 +217,44 @@ export default function MemberForm() {
       generationNumber: values.generationNumber,
       siblingOrder: values.siblingOrder,
     };
+  };
 
+  const performSave = (memberData: Omit<FamilyMember, 'id'>) => {
     if (isEditing && id) {
       const result = updateMember(id, memberData);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
+      if (result.error) { toast.error(result.error); return; }
       toast.success("Member updated successfully");
       setLocation(`/members/${id}`);
     } else {
       const result = addMember(memberData);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
+      if (result.error) { toast.error(result.error); return; }
       toast.success("Member added successfully");
       setLocation(`/members/${result.member.id}`);
     }
+  };
+
+  const onSubmit = (values: FormValues) => {
+    const memberData = buildMemberData(values);
+
+    // Duplicate detection (skip when editing the same person)
+    const dupes = detectPotentialDuplicates(
+      { fullName: memberData.fullName, phone: memberData.phone, birthday: memberData.birthday },
+      isEditing ? id : undefined
+    );
+
+    if (dupes.length > 0) {
+      setDuplicatesFound(dupes);
+      setPendingData(memberData);
+      return;
+    }
+
+    performSave(memberData);
+  };
+
+  const handleConfirmDespiteDuplicates = () => {
+    if (pendingData) performSave(pendingData);
+    setDuplicatesFound([]);
+    setPendingData(null);
   };
 
   return (
@@ -895,6 +926,39 @@ export default function MemberForm() {
           </div>
         </form>
       </Form>
+
+      {/* Duplicate Detection Dialog */}
+      <AlertDialog open={duplicatesFound.length > 0} onOpenChange={(open) => { if (!open) { setDuplicatesFound([]); setPendingData(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Possible Duplicate Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>The following existing member(s) may be duplicates of the person you're adding:</p>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {duplicatesFound.map(({ member, reasons }) => (
+                    <div key={member.id} className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3">
+                      <p className="font-semibold text-foreground text-sm">{member.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{[member.generation, member.city].filter(Boolean).join(" · ")}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{reasons.join(", ")}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm">Are you sure you want to add this as a new member anyway?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel — go back</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDespiteDuplicates} className="bg-amber-600 hover:bg-amber-700 text-white">
+              Add anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

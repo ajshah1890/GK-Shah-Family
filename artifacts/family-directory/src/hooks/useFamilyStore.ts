@@ -3,16 +3,36 @@ import { FamilyMember, SAMPLE_MEMBERS } from '../types/family';
 
 const STORAGE_KEY = 'gkshah_family_members';
 
+function resolveLineageRoot(m: any, allById: Map<string, any>): string | undefined {
+  const visited = new Set<string>();
+  let cur = m;
+  while (cur) {
+    if (visited.has(cur.id)) break;
+    visited.add(cur.id);
+    const parentId = cur.fatherId || cur.motherId;
+    if (!parentId) return cur.id;
+    const parent = allById.get(parentId);
+    if (!parent) return cur.id;
+    cur = parent;
+  }
+  return cur?.id;
+}
+
 function migrateMembers(raw: unknown[]): FamilyMember[] {
-  return raw.map((m: any) => {
+  const allById = new Map((raw as any[]).map(m => [m.id, m]));
+  return (raw as any[]).map((m) => {
     const migrated = { ...m };
-    // Remove old field
+    // Remove stale fields
     delete migrated.relationship;
-    // Migrate familyBranch -> mainFamilyBranch
+    // Rename familyBranch -> mainFamilyBranch
     if (m.familyBranch && !m.mainFamilyBranch) {
       migrated.mainFamilyBranch = m.familyBranch;
     }
     delete migrated.familyBranch;
+    // Auto-compute lineageRootId if missing
+    if (!migrated.lineageRootId) {
+      migrated.lineageRootId = resolveLineageRoot(m, allById);
+    }
     return migrated as FamilyMember;
   });
 }

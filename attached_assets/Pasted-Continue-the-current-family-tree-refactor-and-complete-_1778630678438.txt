@@ -1,0 +1,116 @@
+Continue the current family tree refactor and complete the core genealogy architecture before focusing on cosmetic UI changes.
+
+Main Goal:
+Transform the app from a flat family directory into a true hierarchical multi-generation genealogy system starting from the root ancestor:
+Gandalal Keshav Shah (GK Shah).
+
+Priority Order:
+
+1. Fix hierarchy logic
+2. Prevent duplicate rendering
+3. Build recursive parent-child structure
+4. Then improve tree UI
+5. Then optimize performance and compatibility
+
+Requirements:
+
+1. Relationship Data Model
+   Ensure every member supports:
+
+- memberId
+- fatherId
+- motherId
+- spouseId
+- generationNumber
+- lineageRootId
+- siblingOrder
+
+Maintain backward compatibility with old localStorage data and safely migrate missing fields.
+
+2. Root Ancestor Structure
+   Use:
+
+- Gandalal Keshav Shah (GK Shah)
+  as the root founder node.
+
+Generation system:
+
+- GK Shah = Generation 1
+- Children = Generation 2
+- Grandchildren = Generation 3
+- Continue recursively up to 6 generations.
+
+3. Core Hierarchy Engine
+   Build proper recursive tree logic:
+
+- Only root ancestors render at top level
+- Children render only beneath parents
+- Every member must appear ONLY ONCE in entire tree
+- Prevent duplicate rendering and disconnected standalone cards
+- Automatically nest descendants recursively
+- Handle missing parent data gracefully
+- Avoid circular recursion issues
+
+Create helper utilities if needed:
+
+- buildFamilyTree()
+- getChildren()
+- getAncestors()
+- getDescendants()
+- calculateGeneration()
+
+4. Spouse + Sibling Logic
+
+- Spouses render side-by-side
+- Siblings grouped horizontally under same parents
+- Children displayed below parent pair
+- Preserve sibling order using siblingOrder field
+
+5. Family Member Forms
+   Add searchable dropdown selectors for:
+
+- Father
+- Mother
+- Spouse
+
+When parent selected:
+
+- generation auto-calculates
+- lineageRootId auto-inherits
+- member automatically attaches beneath parents in tree
+
+6. Tree UI Improvements
+   Improve existing UI without rebuilding entire app:
+
+- Connector lines
+- Expand/collapse branches
+- Generation color badges
+- Family branch grouping
+- Zoom and pan support
+- Mobile responsive layout
+- Proper spacing between generations
+- Smooth rendering for 150–300 members
+
+7. Search + Navigation
+
+- Clicking member opens profile
+- Search member inside tree
+- Highlight searched member
+- Auto-expand branch when searched
+
+8. Performance + Stability
+
+- Memoize tree calculations
+- Prevent rerender loops
+- Prevent crashes from partial/incomplete relationships
+- Ensure existing sample data still works
+
+9. Final Verification
+   After implementation:
+
+- Run app successfully
+- Fix all runtime/type/build errors automatically
+- Verify hierarchy correctness
+- Verify no duplicate rendering
+- Verify root-to-generation structure works properly
+- Summarize all architecture and file changes made

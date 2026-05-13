@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, Settings, Network, FileSpreadsheet,
-  Lock, GitMerge, BarChart2, Shield, Search,
+  Lock, GitMerge, BarChart2, Shield, Search, Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 const navItems = [
   { name: "Dashboard",     href: "/",              icon: LayoutDashboard },
   { name: "Members",       href: "/members",        icon: Users },
+  { name: "Moments",       href: "/moments",        icon: Camera },
   { name: "Family Tree",   href: "/family-tree",    icon: Network },
   { name: "Relationships", href: "/relationships",  icon: GitMerge },
   { name: "Statistics",    href: "/statistics",     icon: BarChart2 },

@@ -21,6 +21,7 @@ import { useAdminMode } from "@/hooks/useAdminMode";
 import { Link } from "wouter";
 import { readAuditLog, clearAuditLog, AuditEntry, AuditAction } from "@/lib/auditLog";
 import { photoRepository } from "@/lib/repository";
+import { loadMoments } from "@/lib/momentsRepository";
 import { FamilyMember } from "@/types/family";
 
 interface RestorePreview {
@@ -69,15 +70,17 @@ export default function Settings() {
 
   const handleFullExport = () => {
     const now = new Date().toISOString();
+    const moments = loadMoments();
     const backup = {
       version: 2,
       exportedAt: now,
       memberCount: members.length,
       members,
       auditLog: readAuditLog(),
+      moments,
       meta: {
         appName: "G K Shah Family Chronicle",
-        appVersion: "2.1",
+        appVersion: "2.2",
       },
     };
 
@@ -90,7 +93,7 @@ export default function Settings() {
     URL.revokeObjectURL(url);
 
     localStorage.setItem("gkshah_last_backup_at", now);
-    toast.success(`Full backup exported — ${members.length} members`);
+    toast.success(`Full backup exported — ${members.length} members, ${moments.length} moments`);
   };
 
   // ── Restore preview ───────────────────────────────────────────────────────

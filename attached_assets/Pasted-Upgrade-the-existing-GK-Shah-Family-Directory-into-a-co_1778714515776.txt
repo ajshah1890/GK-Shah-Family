@@ -1,0 +1,305 @@
+Upgrade the existing GK Shah Family Directory into a complete “Family Moments” archival system while keeping the app fully free, local-first, and serverless.
+
+CORE PRINCIPLES:
+
+- No paid backend
+- No cloud database
+- No Firebase/Supabase/AWS
+- No login system
+- Single-admin app only
+- Everything should work fully client-side
+- Continue hosting on Vercel free tier
+- Use IndexedDB + localStorage only
+- Preserve existing architecture and styling
+- Maintain current orange/cream elegant design language
+- Mobile-first responsive design mandatory
+
+GOAL:
+Transform the app from just a directory into a living family archive and memory system.
+
+====================================
+NEW FEATURE: FAMILY MOMENTS
+
+Create a new section called:
+“Family Moments”
+
+Add sidebar item:
+
+- Icon: image/gallery style icon
+- Route: /moments
+
+This should behave like a mini private Instagram/photo wall for the family.
+
+====================================
+MOMENT POST SYSTEM
+
+Create a complete post system.
+
+Each post should support:
+
+- id
+- caption
+- photos[]
+- taggedMembers[]
+- eventDate
+- createdAt
+- location
+- branch
+- eventType
+- favorite
+- archived
+
+Event types:
+
+- Birthday
+- Anniversary
+- Wedding
+- Vacation
+- Achievement
+- Festival
+- Reunion
+- Childhood Memory
+- Legacy
+- Other
+
+====================================
+PHOTO STORAGE RULES
+
+IMPORTANT:
+Everything must remain FREE.
+
+DO NOT:
+
+- upload to cloud
+- use external storage
+- use backend APIs
+
+INSTEAD:
+
+- store compressed images in IndexedDB
+- auto compress before save
+- max width ~1600px
+- image quality ~0.7
+- target 300–500 KB per image
+
+Add lazy loading for performance.
+
+====================================
+CREATE MOMENT PAGE
+
+Add:
+
+- “Create Moment” button
+
+Create form with:
+
+- Upload photos
+- Caption textarea
+- Event date
+- Event type dropdown
+- Location
+- Tag family members
+- Favorite toggle
+
+Preview uploaded photos before save.
+
+Allow:
+
+- multiple photos
+- reorder photos
+- delete photos before save
+
+====================================
+MOMENTS FEED
+
+Create beautiful masonry/grid feed.
+
+Each card should show:
+
+- cover image
+- caption preview
+- event type badge
+- tagged members
+- date
+- location
+
+Add:
+
+- hover animation
+- smooth transitions
+- responsive cards
+
+Clicking opens full post modal/page.
+
+====================================
+FULL POST VIEW
+
+Full page/modal should support:
+
+- photo carousel
+- swipe on mobile
+- full caption
+- tagged members
+- related memories
+- previous/next navigation
+
+====================================
+FILTERS & SEARCH
+
+Add filters:
+
+- by member
+- by branch
+- by year
+- by event type
+- favorites only
+
+Add search:
+
+- caption
+- member names
+- locations
+
+====================================
+TIMELINE VIEW
+
+Add alternate timeline mode:
+
+- chronological family history
+- grouped by year
+- expandable sections
+
+Example:
+2026
+
+- Japan Internship
+- Family Reunion
+
+2025
+
+- Wedding
+- Diwali Celebration
+
+====================================
+ON THIS DAY
+
+Dashboard widget:
+“On This Day”
+
+Show memories from same date in previous years.
+
+====================================
+MEMORY SLIDESHOW MODE
+
+Create:
+“Slideshow Mode”
+
+Full-screen autoplay gallery for family gatherings/TV display.
+
+Features:
+
+- autoplay
+- fade transitions
+- keyboard navigation
+- pause/play
+- fullscreen button
+
+====================================
+MEMBER PROFILE INTEGRATION
+
+Inside each member profile:
+Add:
+“Memories” tab
+
+Show all moments where member is tagged.
+
+====================================
+PERFORMANCE & SAFETY
+
+Must include:
+
+- ErrorBoundary protection
+- runtime guards
+- null safety
+- defensive rendering
+
+Prevent:
+
+- crashes from missing IDs
+- empty arrays
+- invalid photos
+- corrupted local data
+
+====================================
+BACKUP SYSTEM
+
+Extend existing backup/export system.
+
+Backups must include:
+
+- members
+- relationships
+- moments
+- photos metadata
+- settings
+
+Support:
+
+- export JSON
+- restore JSON
+
+====================================
+FREE FOREVER ARCHITECTURE
+
+Maintain:
+
+- Vercel free hosting
+- GitHub repo
+- IndexedDB storage
+- offline-first architecture
+
+No paid services.
+
+====================================
+FUTURE-READY STRUCTURE
+
+Structure code cleanly for future optional features:
+
+- WhatsApp reminders
+- AI relationship search
+- Voice notes
+- Family documents
+- Elder stories
+- Family yearbook
+
+But DO NOT implement backend complexity now.
+
+====================================
+UI/UX REQUIREMENTS
+
+Keep aesthetic:
+
+- elegant
+- warm
+- heritage-inspired
+- minimal clutter
+- modern but emotional
+
+Use:
+
+- smooth animations
+- skeleton loaders
+- graceful empty states
+- polished mobile experience
+
+Avoid:
+
+- social-media chaos
+- public-feed feel
+- excessive gamification
+- likes/comments
+
+This should feel like:
+“A digital family museum and memory archive.”
+
+Ensure full TypeScript safety, responsive layouts, and production-grade stability throughout.

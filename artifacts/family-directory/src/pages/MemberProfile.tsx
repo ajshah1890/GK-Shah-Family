@@ -1,10 +1,12 @@
 import { useFamilyStore } from "@/hooks/useFamilyStore";
+import { useMomentsStore } from "@/hooks/useMomentsStore";
+import { MomentCard } from "@/components/moments/MomentCard";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { useParams, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight, Hash, Link as LinkIcon, GitMerge } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Briefcase, Calendar, Heart, MessageCircle, Share2, Globe, Linkedin, Instagram, GitBranch, Users, ChevronRight, Hash, Link as LinkIcon, GitMerge, Camera } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import { getAncestryPath, getDescendants } from "@/lib/familyTree";
@@ -25,6 +27,7 @@ export default function MemberProfile() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { members, deleteMember, isLoaded, archiveMember } = useFamilyStore();
+  const { activeMoments } = useMomentsStore();
   const { isAdmin } = useAdminMode();
   
   const ancestryPath = useMemo(
@@ -649,6 +652,33 @@ export default function MemberProfile() {
                   <p className="whitespace-pre-wrap">{member.notes}</p>
                 </section>
               )}
+
+              {/* Memories */}
+              {(() => {
+                const memberMoments = activeMoments.filter(m => m.taggedMemberIds.includes(member.id));
+                if (memberMoments.length === 0) return null;
+                return (
+                  <section>
+                    <div className="flex items-center justify-between border-b pb-2 mb-4">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Camera className="w-3.5 h-3.5" /> Memories ({memberMoments.length})
+                      </h3>
+                      <Link href={`/moments?member=${member.id}`} className="text-xs text-primary hover:underline">
+                        View all
+                      </Link>
+                    </div>
+                    <div className="columns-1 sm:columns-2 gap-4">
+                      {memberMoments.slice(0, 4).map(moment => (
+                        <MomentCard
+                          key={moment.id}
+                          moment={moment}
+                          members={members}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>

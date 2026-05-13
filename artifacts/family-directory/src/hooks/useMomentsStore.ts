@@ -1,0 +1,162 @@
+import { useState, useEffect, useCallback } from "react";
+import { Moment, EventType } from "@/types/moments";
+import {
+  loadMoments,
+  saveMoments,
+  saveMomentPhoto,
+  deleteMomentPhoto,
+  makeMomentPhotoKey,
+} from "@/lib/momentsRepository";
+
+function generateId(): string {
+  return `moment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export interface CreateMomentInput {
+  caption: string;
+  photoDataUrls: string[];
+  taggedMemberIds: string[];
+  eventDate: string;
+  location?: string;
+  branch?: string;
+  eventType: EventType;
+  favorite?: boolean;
+}
+
+export interface UpdateMomentInput extends Partial<CreateMomentInput> {
+  favorite?: boolean;
+  archived?: boolean;
+}
+
+export function useMomentsStore() {
+  const [moments, setMoments] = useState<Moment[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loaded = loadMoments();
+    setMoments(loaded);
+    setIsLoaded(true);
+  }, []);
+
+  const persist = useCallback((updated: Moment[]) => {
+    setMoments(updated);
+    saveMoments(updated);
+  }, []);
+
+  const createMoment = useCallback(
+    async (input: CreateMomentInput): Promise<Moment> => {
+      const id = generateId();
+      const now = new Date().toISOString();
+
+      const photoKeys: string[] = [];
+      for (let i = 0; i < input.photoDataUrls.length; i++) {
+        const key = makeMomentPhotoKey(id, i);
+        await saveMomentPhoto(key, input.photoDataUrls[i]);
+        photoKeys.push(key);
+      }
+
+      const moment: Moment = {
+        id,
+        caption: input.caption,
+        photoKeys,
+        taggedMemberIds: input.taggedMemberIds,
+        eventDate: input.eventDate,
+        location: input.location,
+        branch: input.branch,
+        eventType: input.eventType,
+        favorite: input.favorite ?? false,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      persist([moment, ...moments]);
+      return moment;
+    },
+    [moments, persist]
+  );
+
+  const updateMoment = useCallback(
+    async (id: string, input: UpdateMomentInput & { newPhotoDataUrls?: string[]; removedPhotoKeys?: string[] }): Promise<void> => {
+      const existing = moments.find((m) => m.id === id);
+      if (!existing) return;
+
+      let photoKeys = [...existing.photoKeys];
+
+      if (input.removedPhotoKeys?.length) {
+        for (const key of input.removedPhotoKeys) {
+          await deleteMomentPhoto(key);
+          photoKeys = photoKeys.filter((k) => k !== key);
+        }
+      }
+
+      if (input.newPhotoDataUrls?.length) {
+        const startIdx = existing.photoKeys.length;
+        for (let i = 0; i < input.newPhotoDataUrls.length; i++) {
+          const key = makeMomentPhotoKey(id, startIdx + i);
+          await saveMomentPhoto(key, input.newPhotoDataUrls[i]);
+          photoKeys.push(key);
+        }
+      }
+
+      const updated: Moment = {
+        ...existing,
+        caption: input.caption ?? existing.caption,
+        photoKeys,
+        taggedMemberIds: input.taggedMemberIds ?? existing.taggedMemberIds,
+        eventDate: input.eventDate ?? existing.eventDate,
+        location: input.location !== undefined ? input.location : existing.location,
+        branch: input.branch !== undefined ? input.branch : existing.branch,
+        eventType: input.eventType ?? existing.eventType,
+        favorite: input.favorite !== undefined ? input.favorite : existing.favorite,
+        archived: input.archived !== undefined ? input.archived : existing.archived,
+        updatedAt: new Date().toISOString(),
+      };
+
+      persist(moments.map((m) => (m.id === id ? updated : m)));
+    },
+    [moments, persist]
+  );
+
+  const deleteMoment = useCallback(
+    async (id: string): Promise<void> => {
+      const existing = moments.find((m) => m.id === id);
+      if (existing) {
+        for (const key of existing.photoKeys) {
+          await deleteMomentPhoto(key);
+        }
+      }
+      persist(moments.filter((m) => m.id !== id));
+    },
+    [moments, persist]
+  );
+
+  const toggleFavorite = useCallback(
+    (id: string) => {
+      persist(
+        moments.map((m) =>
+          m.id === id ? { ...m, favorite: !m.favorite, updatedAt: new Date().toISOString() } : m
+        )
+      );
+    },
+    [moments, persist]
+  );
+
+  const getMoment = useCallback(
+    (id: string): Moment | undefined => moments.find((m) => m.id === id),
+    [moments]
+  );
+
+  const activeMoments = moments.filter((m) => !m.archived);
+
+  return {
+    moments,
+    activeMoments,
+    isLoaded,
+    createMoment,
+    updateMoment,
+    deleteMoment,
+    toggleFavorite,
+    getMoment,
+  };
+}

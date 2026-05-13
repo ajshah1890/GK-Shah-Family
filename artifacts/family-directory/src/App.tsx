@@ -16,6 +16,9 @@ import Settings from "@/pages/Settings";
 import Import from "@/pages/Import";
 import RelationshipExplorer from "@/pages/RelationshipExplorer";
 import DataHealth from "@/pages/DataHealth";
+import Moments from "@/pages/Moments";
+import MomentForm from "@/pages/MomentForm";
+import MomentDetail from "@/pages/MomentDetail";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -36,6 +39,9 @@ function Router() {
           <Route path="/statistics" component={Statistics} />
           <Route path="/settings" component={Settings} />
           <Route path="/data-health" component={DataHealth} />
+          <Route path="/moments" component={Moments} />
+          <Route path="/moments/new" component={MomentForm} />
+          <Route path="/moments/:id" component={MomentDetail} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

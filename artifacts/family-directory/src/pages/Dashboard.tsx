@@ -1,7 +1,9 @@
 import { useFamilyStore } from "@/hooks/useFamilyStore";
+import { useMomentsStore } from "@/hooks/useMomentsStore";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
+import { OnThisDay } from "@/components/dashboard/OnThisDay";
 import {
   Users, UserPlus, FileText, PieChart, Info, MapPin,
   Download, GitBranch, Archive, X,
@@ -14,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Dashboard() {
   const { members, isLoaded } = useFamilyStore();
+  const { activeMoments } = useMomentsStore();
   const { canInstall, install } = usePWAInstall();
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [backupDismissed, setBackupDismissed] = useState(false);
@@ -209,6 +212,10 @@ export default function Dashboard() {
         <UpcomingEvents members={members} type="birthday" />
         <UpcomingEvents members={members} type="anniversary" />
       </div>
+
+      {activeMoments.length > 0 && (
+        <OnThisDay moments={activeMoments} members={members} />
+      )}
 
       {recentMembers.length > 0 && (
         <section>

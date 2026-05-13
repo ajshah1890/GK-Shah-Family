@@ -1,12 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Network, GitMerge, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Network, Camera, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Home",    href: "/",              icon: LayoutDashboard },
   { name: "Members", href: "/members",        icon: Users },
+  { name: "Moments", href: "/moments",        icon: Camera },
   { name: "Tree",    href: "/family-tree",    icon: Network },
-  { name: "Related", href: "/relationships",  icon: GitMerge },
   { name: "Settings",href: "/settings",       icon: Settings },
 ];
 

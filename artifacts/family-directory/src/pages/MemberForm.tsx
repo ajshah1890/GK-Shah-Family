@@ -93,7 +93,20 @@ export default function MemberForm() {
   const [pendingData, setPendingData] = useState<Omit<FamilyMember, 'id'> | null>(null);
 
   const isHydrating = useRef(false);
-  const originalRelIds = useRef<{ fatherId?: string; motherId?: string; spouseId?: string }>({});
+  const hydrated = useRef(false);
+
+  /** Snapshot of the DB values when edit form opened — used as fallback on save. */
+  const originalValues = useRef<{
+    fatherId?: string; motherId?: string; spouseId?: string;
+    gender?: "Male" | "Female" | "Other"; bloodGroup?: string;
+  }>({});
+  // Backward-compat alias used in a few places below
+  const originalRelIds = originalValues;
+
+  /** Fields the user explicitly cleared via the "None" button in a combobox.
+   *  Only these are allowed to become undefined on save; un-touched empty fields
+   *  fall back to originalValues to survive hydration failures. */
+  const userExplicitlyClearedRels = useRef<Set<"fatherId" | "motherId" | "spouseId">>(new Set());
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -139,72 +152,86 @@ export default function MemberForm() {
   });
 
   useEffect(() => {
-    if (isLoaded && isEditing) {
-      const member = members.find(m => m.id === id);
-      if (member) {
-        originalRelIds.current = {
-          fatherId: member.fatherId,
-          motherId: member.motherId,
-          spouseId: member.spouseId,
-        };
-        console.log("[GKShah] Editing member:", {
-          name: member.fullName,
-          "original fatherId": member.fatherId,
-          "original motherId": member.motherId,
-          "original spouseId": member.spouseId,
-          "original generationNumber": member.generationNumber,
-        });
+    // Only hydrate once per member id — prevents re-hydration wiping user edits
+    // whenever the members array reference changes (e.g. GitHub sync, other saves).
+    if (!isLoaded || !isEditing || hydrated.current) return;
+    const member = members.find(m => m.id === id);
+    if (!member) return;
 
-        isHydrating.current = true;
-        form.reset({
-          fullName: member.fullName ?? "",
-          photo: (member.photo && !member.photo.startsWith("idb:")) ? member.photo : "",
-          gender: member.gender,
-          generation: member.generation ?? "",
-          nativePlace: member.nativePlace ?? "",
-          birthday: member.birthday ?? "",
-          anniversary: member.anniversary ?? "",
-          address: member.address ?? "",
-          mapsLink: member.mapsLink ?? "",
-          city: member.city ?? "",
-          country: member.country ?? "",
-          phone: member.phone ?? "",
-          whatsapp: member.whatsapp ?? "",
-          email: member.email ?? "",
-          personalWebsite: member.personalWebsite ?? "",
-          linkedIn: member.linkedIn ?? "",
-          instagram: member.instagram ?? "",
-          profession: member.profession ?? "",
-          company: member.company ?? "",
-          previousCompany: member.previousCompany ?? "",
-          businessName: member.businessName ?? "",
-          education: member.education ?? "",
-          bloodGroup: member.bloodGroup ?? "",
-          mainFamilyBranch: member.mainFamilyBranch ?? "",
-          subFamilyBranch: member.subFamilyBranch ?? "",
-          spouseName: member.spouseName ?? "",
-          childrenNamesStr: member.childrenNames?.join(", ") ?? "",
-          hobbies: member.hobbies ?? "",
-          skills: member.skills ?? "",
-          languagesSpoken: member.languagesSpoken ?? "",
-          emergencyContact: member.emergencyContact ?? "",
-          notes: member.notes ?? "",
-          fatherId: member.fatherId ?? "",
-          motherId: member.motherId ?? "",
-          spouseId: member.spouseId ?? "",
-          generationNumber: member.generationNumber,
-          siblingOrder: member.siblingOrder,
-        });
-        setTimeout(() => { isHydrating.current = false; }, 0);
+    hydrated.current = true;
 
-        if (member.photo && !member.photo.startsWith("idb:")) {
-          setPhotoPreview(member.photo);
-        }
-      }
+    // Snapshot DB values; used as fallback in buildMemberData if a field silently fails to hydrate
+    originalValues.current = {
+      fatherId:   member.fatherId,
+      motherId:   member.motherId,
+      spouseId:   member.spouseId,
+      gender:     member.gender,
+      bloodGroup: member.bloodGroup,
+    };
+
+    isHydrating.current = true;
+    form.reset({
+      fullName: member.fullName ?? "",
+      photo: (member.photo && !member.photo.startsWith("idb:")) ? member.photo : "",
+      gender: member.gender,
+      generation: member.generation ?? "",
+      nativePlace: member.nativePlace ?? "",
+      birthday: member.birthday ?? "",
+      anniversary: member.anniversary ?? "",
+      address: member.address ?? "",
+      mapsLink: member.mapsLink ?? "",
+      city: member.city ?? "",
+      country: member.country ?? "",
+      phone: member.phone ?? "",
+      whatsapp: member.whatsapp ?? "",
+      email: member.email ?? "",
+      personalWebsite: member.personalWebsite ?? "",
+      linkedIn: member.linkedIn ?? "",
+      instagram: member.instagram ?? "",
+      profession: member.profession ?? "",
+      company: member.company ?? "",
+      previousCompany: member.previousCompany ?? "",
+      businessName: member.businessName ?? "",
+      education: member.education ?? "",
+      bloodGroup: member.bloodGroup ?? "",
+      mainFamilyBranch: member.mainFamilyBranch ?? "",
+      subFamilyBranch: member.subFamilyBranch ?? "",
+      spouseName: member.spouseName ?? "",
+      childrenNamesStr: member.childrenNames?.join(", ") ?? "",
+      hobbies: member.hobbies ?? "",
+      skills: member.skills ?? "",
+      languagesSpoken: member.languagesSpoken ?? "",
+      emergencyContact: member.emergencyContact ?? "",
+      notes: member.notes ?? "",
+      fatherId: member.fatherId ?? "",
+      motherId: member.motherId ?? "",
+      spouseId: member.spouseId ?? "",
+      generationNumber: member.generationNumber,
+      siblingOrder: member.siblingOrder,
+    });
+    // Keep isHydrating true until after React has committed the new values and
+    // all triggered effects have run (rAF fires after paint, well after effects).
+    requestAnimationFrame(() => { isHydrating.current = false; });
+
+    if (member.photo && !member.photo.startsWith("idb:")) {
+      setPhotoPreview(member.photo);
     }
-  }, [isLoaded, isEditing, id, members, form]);
+  }, [isLoaded, isEditing, id, members]); // `members` needed for find(); hydrated.current prevents re-runs
 
-  const fatherId = form.watch("fatherId");
+  // When navigating to a different member, reset the one-time hydration guard
+  // and clear the explicit-clear tracking so the new member starts fresh.
+  useEffect(() => {
+    hydrated.current = false;
+    userExplicitlyClearedRels.current = new Set();
+  }, [id]);
+
+  // Watch all five hydration-sensitive fields for the debug panel + generation effect
+  const fatherId      = form.watch("fatherId");
+  const watchMotherId = form.watch("motherId");
+  const watchSpouseId = form.watch("spouseId");
+  const watchGender   = form.watch("gender");
+  const watchBloodGroup = form.watch("bloodGroup");
+
   useEffect(() => {
     // Skip auto-generation-compute during programmatic hydration (form.reset).
     // Only fire when the user actively changes the father field.
@@ -308,13 +335,43 @@ export default function MemberForm() {
   const buildMemberData = (values: FormValues) => {
     const { childrenNamesStr, photo, ...rest } = values;
     const finalPhoto = photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(values.fullName)}`;
+    const orig    = originalValues.current;
+    const cleared = userExplicitlyClearedRels.current;
+    const dirty   = form.formState.dirtyFields;
+
+    // ── Relationship fields ───────────────────────────────────────────────────
+    // Rule: if the form value is empty AND the user did NOT explicitly click "None",
+    // fall back to the original DB value.  This survives any hydration timing failure.
+    const fatherIdFinal = values.fatherId
+      ? values.fatherId
+      : cleared.has("fatherId") ? undefined : (orig.fatherId ?? undefined);
+
+    const motherIdFinal = values.motherId
+      ? values.motherId
+      : cleared.has("motherId") ? undefined : (orig.motherId ?? undefined);
+
+    const spouseIdFinal = values.spouseId
+      ? values.spouseId
+      : cleared.has("spouseId") ? undefined : (orig.spouseId ?? undefined);
+
+    // ── Gender & blood group ──────────────────────────────────────────────────
+    // Only overwrite with form value if the user actually touched the field (dirty).
+    // If not dirty and the form value is missing, fall back to the original.
+    const genderFinal: "Male" | "Female" | "Other" | undefined =
+      values.gender ?? (!dirty.gender ? orig.gender : undefined);
+
+    const bloodGroupFinal: string | undefined =
+      values.bloodGroup || (!dirty.bloodGroup ? (orig.bloodGroup ?? undefined) : undefined) || undefined;
+
     return {
       ...rest,
       photo: finalPhoto,
+      gender: genderFinal,
+      bloodGroup: bloodGroupFinal,
       childrenNames: childrenNamesStr ? childrenNamesStr.split(",").map(s => s.trim()).filter(Boolean) : [],
-      fatherId: values.fatherId || undefined,
-      motherId: values.motherId || undefined,
-      spouseId: values.spouseId || undefined,
+      fatherId:  fatherIdFinal,
+      motherId:  motherIdFinal,
+      spouseId:  spouseIdFinal,
       generationNumber: values.generationNumber,
       siblingOrder: values.siblingOrder,
     };
@@ -337,27 +394,23 @@ export default function MemberForm() {
   const onSubmit = (values: FormValues) => {
     const memberData = buildMemberData(values);
 
-    // Emit diagnostics so issues are visible in the browser console
+    // Pre-save integrity: warn if a relationship is being removed
     if (isEditing) {
-      const orig = originalRelIds.current;
-      console.log("[GKShah] Saving member:", {
-        name: memberData.fullName,
-        "saved fatherId": memberData.fatherId ?? null,
-        "saved motherId": memberData.motherId ?? null,
-        "saved spouseId": memberData.spouseId ?? null,
-        "saved generationNumber": memberData.generationNumber ?? null,
-      });
-      if (orig.fatherId && !memberData.fatherId) {
-        console.warn("[GKShah] fatherId was cleared during save:", { original: orig.fatherId });
-        toast.warning("Father relationship was removed. Re-select if this was unintentional.");
+      const orig    = originalRelIds.current;
+      const cleared = userExplicitlyClearedRels.current;
+
+      if (orig.fatherId && !memberData.fatherId && !cleared.has("fatherId")) {
+        // Should not happen with preservation logic — flag for debugging
+        console.warn("[GKShah] Unexpected fatherId loss on save:", { original: orig.fatherId });
       }
-      if (orig.motherId && !memberData.motherId) {
-        console.warn("[GKShah] motherId was cleared during save:", { original: orig.motherId });
-        toast.warning("Mother relationship was removed. Re-select if this was unintentional.");
+      if (orig.fatherId && !memberData.fatherId && cleared.has("fatherId")) {
+        toast.warning("Father relationship removed. Undo to restore if unintentional.");
       }
-      if (orig.spouseId && !memberData.spouseId) {
-        console.warn("[GKShah] spouseId was cleared during save:", { original: orig.spouseId });
-        toast.warning("Spouse relationship was removed. Re-select if this was unintentional.");
+      if (orig.motherId && !memberData.motherId && cleared.has("motherId")) {
+        toast.warning("Mother relationship removed. Undo to restore if unintentional.");
+      }
+      if (orig.spouseId && !memberData.spouseId && cleared.has("spouseId")) {
+        toast.warning("Spouse relationship removed. Undo to restore if unintentional.");
       }
     }
 
@@ -569,6 +622,7 @@ export default function MemberForm() {
                         <RelationshipCombobox
                           value={field.value ?? ""}
                           onChange={(val) => field.onChange(val)}
+                          onClear={() => userExplicitlyClearedRels.current.add("fatherId")}
                           members={members}
                           placeholder="Select father…"
                           excludeId={id}
@@ -584,6 +638,7 @@ export default function MemberForm() {
                         <RelationshipCombobox
                           value={field.value ?? ""}
                           onChange={(val) => field.onChange(val)}
+                          onClear={() => userExplicitlyClearedRels.current.add("motherId")}
                           members={members}
                           placeholder="Select mother…"
                           excludeId={id}
@@ -603,6 +658,10 @@ export default function MemberForm() {
                             const spouse = members.find(m => m.id === val);
                             if (spouse) form.setValue("spouseName", spouse.fullName);
                             if (!val) form.setValue("spouseName", "");
+                          }}
+                          onClear={() => {
+                            userExplicitlyClearedRels.current.add("spouseId");
+                            form.setValue("spouseName", "");
                           }}
                           members={members}
                           placeholder="Select spouse…"
@@ -1052,6 +1111,42 @@ export default function MemberForm() {
               />
             </CardContent>
           </Card>
+
+          {/* ── Hydration debug panel (edit mode only) ─────────────────────── */}
+          {isEditing && (
+            <details className="rounded-lg border border-dashed border-border text-[11px] font-mono">
+              <summary className="px-3 py-2 cursor-pointer text-muted-foreground select-none">
+                Form state inspector (edit debug)
+              </summary>
+              <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                {([
+                  { label: "gender",    persisted: originalValues.current.gender,    form: watchGender     ?? "" },
+                  { label: "bloodGroup",persisted: originalValues.current.bloodGroup, form: watchBloodGroup ?? "" },
+                  { label: "fatherId",  persisted: originalValues.current.fatherId,  form: fatherId        ?? "",
+                    name: fatherId ? members.find(m => m.id === fatherId)?.fullName : "" },
+                  { label: "motherId",  persisted: originalValues.current.motherId,  form: watchMotherId   ?? "",
+                    name: watchMotherId ? members.find(m => m.id === watchMotherId)?.fullName : "" },
+                  { label: "spouseId",  persisted: originalValues.current.spouseId,  form: watchSpouseId   ?? "",
+                    name: watchSpouseId ? members.find(m => m.id === watchSpouseId)?.fullName : "" },
+                ] as { label: string; persisted?: string; form: string; name?: string }[]).map(row => {
+                  const match = (row.persisted ?? "") === row.form;
+                  return (
+                    <div key={row.label} className={`flex flex-col gap-0.5 py-0.5 border-b border-border/40 last:border-0 ${match ? "" : "text-amber-600 dark:text-amber-400"}`}>
+                      <span className="font-semibold">{row.label}</span>
+                      <span className="text-muted-foreground">DB:&nbsp;&nbsp;&nbsp;{row.persisted || "—"}</span>
+                      <span>Form: {row.form || "—"}{row.name ? ` (${row.name})` : ""}</span>
+                      <span className={match ? "text-green-600 dark:text-green-400" : "text-amber-500"}>
+                        {match ? "✓ match" : "⚠ mismatch — original will be preserved on save"}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="sm:col-span-2 pt-1 text-muted-foreground">
+                  Explicitly cleared: [{Array.from(userExplicitlyClearedRels.current).join(", ") || "none"}]
+                </div>
+              </div>
+            </details>
+          )}
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={() => setLocation(isEditing ? `/members/${id}` : "/members")}>

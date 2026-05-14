@@ -1,0 +1,80 @@
+CRITICAL REMAINING REGRESSION — EDIT FORM STILL LOSING RELATIONSHIP DATA
+
+The earlier fixes improved hydration, but the issue is NOT fully resolved.
+
+Problem still happening:
+When editing an existing member, some persisted values are still not reliably loading into the form.
+
+Fields affected:
+
+* gender
+* father
+* mother
+* spouse
+* blood group
+
+If the user saves without manually reselecting them, relationship integrity can still break.
+
+Additional issue:
+Father/Mother/Spouse selectors still have usability problems with large datasets:
+
+* difficult scrolling
+* selected value not always visibly restored
+* sometimes appears visually blank despite existing stored ID
+
+Tasks:
+
+1. Audit entire edit lifecycle:
+
+* initial member fetch
+* form.reset()
+* Select hydration
+* controlled/uncontrolled transitions
+* save serialization
+
+2. Add explicit hydration verification:
+   After form.reset(), verify:
+
+* UI displayed value
+* underlying form state
+* persisted member value
+  all match.
+
+3. Add temporary visual debug section in edit mode:
+   Show:
+
+* persisted fatherId
+* hydrated fatherId
+* displayed selected father
+* same for mother/spouse
+
+4. Prevent silent relational clearing:
+   If an existing relationship field becomes empty during save,
+   but the user never intentionally changed it,
+   preserve original value automatically.
+
+5. Ensure relationship combobox:
+
+* restores existing selected member visually
+* scrolls correctly on desktop/mobile
+* auto-scrolls to selected value on open
+* supports 100+ members smoothly
+
+6. Add “dirty tracking” specifically for relational fields:
+   Only overwrite:
+
+* fatherId
+* motherId
+* spouseId
+  if the user explicitly modified them.
+
+7. Add final integrity validation before save:
+   Warn/block if:
+
+* member suddenly loses both parents
+* spouse link removed unexpectedly
+* lineageRootId disappears
+* generation changes unexpectedly
+
+Goal:
+Editing a member must NEVER accidentally detach them from the family tree again.

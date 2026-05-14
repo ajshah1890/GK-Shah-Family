@@ -279,6 +279,59 @@ export function repairMissingLineageRoots(members: FamilyMember[]): FamilyMember
   }));
 }
 
+/** Recomputes generationNumber for every member by walking ancestry chains from roots. */
+export function recomputeAllGenerations(members: FamilyMember[]): FamilyMember[] {
+  const map = new Map(members.map((m) => m.id ? [m.id, m] as const : null).filter(Boolean) as [string, FamilyMember][]);
+  const cache = new Map<string, number>();
+
+  function computeGen(id: string, visited = new Set<string>()): number {
+    if (cache.has(id)) return cache.get(id)!;
+    if (visited.has(id)) return 1; // cycle guard
+    visited.add(id);
+    const m = map.get(id);
+    if (!m) return 1;
+    const parentId = m.fatherId || m.motherId;
+    if (!parentId || !map.has(parentId)) {
+      cache.set(id, 1);
+      return 1;
+    }
+    const gen = computeGen(parentId, visited) + 1;
+    cache.set(id, gen);
+    return gen;
+  }
+
+  members.forEach((m) => { if (m.id) computeGen(m.id); });
+
+  const ordinals = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
+  return members.map((m) => {
+    if (!m.id) return m;
+    const gen = cache.get(m.id) ?? m.generationNumber ?? 1;
+    return {
+      ...m,
+      generationNumber: gen,
+      generation: `${ordinals[gen - 1] ?? `${gen}th`} Generation`,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+
+/** Ensures spouse relationships are bidirectional. */
+export function repairSpouseBacklinks(members: FamilyMember[]): FamilyMember[] {
+  const map = new Map(members.map((m) => [m.id, { ...m }]));
+
+  for (const m of map.values()) {
+    if (m.spouseId && map.has(m.spouseId)) {
+      const spouse = map.get(m.spouseId)!;
+      if (!spouse.spouseId) {
+        spouse.spouseId = m.id;
+        spouse.updatedAt = new Date().toISOString();
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 /** Full data integrity report. */
 export interface IntegrityReport {
   orphans: OrphanInfo[];

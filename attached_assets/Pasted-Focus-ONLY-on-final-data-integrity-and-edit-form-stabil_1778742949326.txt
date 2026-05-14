@@ -1,0 +1,186 @@
+Focus ONLY on final data integrity and edit-form stabilization.
+
+Do NOT redesign UI.
+Do NOT add new features.
+Do NOT touch import logic unless directly related.
+
+The family tree is now correctly importing and connecting all 134 members.
+Current issues are ONLY around edit hydration, generation offsets, dropdown UX, and GitHub sync reliability.
+
+====================================
+ISSUE 1 — EDIT FORM DETACHES MEMBERS
+====================================
+
+Problem:
+When editing an existing member:
+
+* gender resets
+* father resets
+* mother resets
+* spouse resets
+* blood group resets
+
+If saved without reselecting them, the member becomes detached from the tree.
+
+Root cause is likely:
+
+* form.reset() missing fields
+* Select components not hydrating existing values
+* mismatch between undefined/null/""
+* relational IDs not binding correctly
+
+Fix requirements:
+
+1. Audit MemberForm hydration logic.
+
+2. Ensure ALL fields hydrate from existing member:
+
+* gender
+* fatherId
+* motherId
+* spouseId
+* bloodGroup
+* generation
+* lineageRootId
+
+3. Ensure Select components correctly display persisted values.
+
+4. NEVER convert valid IDs into:
+
+* ""
+* undefined
+* null
+  during edit hydration.
+
+5. Add console diagnostics:
+   Editing member:
+
+* original fatherId
+* hydrated fatherId
+* saved fatherId
+
+6. Add form dirty-state protection:
+   Do not overwrite untouched relational fields during save.
+
+7. Add validation before save:
+   Warn if:
+
+* fatherId suddenly removed
+* spouseId suddenly removed
+* lineageRootId removed
+
+====================================
+ISSUE 2 — DROPDOWN CANNOT SCROLL
+================================
+
+Problem:
+Father/Mother/Spouse dropdowns cannot scroll fully on desktop/mobile.
+
+Fix:
+
+1. Make SelectContent scrollable.
+
+2. Add:
+
+* max-height
+* overflow-y-auto
+
+3. Ensure touch scrolling works on mobile.
+
+4. Ensure body scroll is not captured by dropdown.
+
+5. Add searchable relationship selector:
+
+* search by name
+* search by city
+* search by branch
+
+Because 134+ members is now too large for flat dropdown UX.
+
+====================================
+ISSUE 3 — GENERATION OFFSET WRONG
+=================================
+
+Problem:
+Tree currently compresses generations.
+Example:
+Actual 4th gen shown as 3rd gen.
+
+Fix:
+
+1. Audit generation reconstruction logic.
+
+2. Preserve imported generationNumber exactly.
+
+3. Do NOT recompute generations unless:
+   “Recompute Generations” explicitly enabled.
+
+4. Tree rendering should use stored generationNumber directly.
+
+5. Add diagnostics:
+
+* imported generation
+* computed generation
+* rendered generation
+
+6. Add “Repair Generations” utility in Data Health:
+
+* recompute generations from roots
+* preview changes before applying
+
+====================================
+ISSUE 4 — GITHUB SYNC STILL FAILING
+===================================
+
+Current error:
+“Unexpected end of JSON input”
+
+Fix ALL sync API robustness.
+
+Requirements:
+
+1. Every API route must ALWAYS return JSON.
+
+2. Never return:
+
+* empty body
+* undefined
+* plain text
+* HTML
+
+3. Wrap all API handlers in try/catch.
+
+4. Add frontend safe parsing:
+   Do not call response.json() blindly.
+
+5. Validate:
+
+* response.ok
+* content-type includes application/json
+
+6. Add detailed sync diagnostics:
+
+* HTTP status
+* parsed response
+* GitHub API error
+* token presence
+* repo path
+* branch
+* latency
+
+7. Add “Test GitHub Connection” button.
+
+8. Add visible sync logs in Settings.
+
+====================================
+FINAL GOAL
+==========
+
+After fixes:
+
+* Editing a member must NEVER detach them from tree
+* Relationship fields must persist correctly
+* Dropdowns must support large family datasets
+* Generations must render accurately
+* GitHub sync must become reliable and debuggable
+* 134-member tree should remain fully connected after edits

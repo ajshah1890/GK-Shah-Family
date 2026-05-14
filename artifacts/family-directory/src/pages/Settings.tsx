@@ -24,7 +24,7 @@ import { readAuditLog, clearAuditLog, AuditEntry, AuditAction } from "@/lib/audi
 import { photoRepository } from "@/lib/repository";
 import { loadMoments } from "@/lib/momentsRepository";
 import { FamilyMember } from "@/types/family";
-import { syncToGitHub } from "@/hooks/useGitHubSync";
+import { syncToGitHub, testGitHubConnection, getAllDiagnostics, type ConnectionTestResult, type SyncDiagnostic } from "@/hooks/useGitHubSync";
 import { hardResetAllData } from "@/lib/hardReset";
 import { useMomentsStore } from "@/hooks/useMomentsStore";
 
@@ -59,6 +59,23 @@ export default function Settings() {
   const [momentsSavedAt, setMomentsSavedAt] = useState<string | null>(null);
   const [membersSyncError, setMembersSyncError] = useState<string | null>(null);
   const [momentsSyncError, setMomentsSyncError] = useState<string | null>(null);
+
+  const [connTestState, setConnTestState] = useState<"idle" | "testing" | "done">("idle");
+  const [connTestResult, setConnTestResult] = useState<ConnectionTestResult | null>(null);
+  const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostic[]>([]);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+  const handleTestConnection = useCallback(async () => {
+    setConnTestState("testing");
+    const result = await testGitHubConnection();
+    setConnTestResult(result);
+    setConnTestState("done");
+  }, []);
+
+  const handleShowDiagnostics = useCallback(() => {
+    setSyncDiagnostics(getAllDiagnostics());
+    setShowDiagnostics(true);
+  }, []);
 
   const handleSyncMembers = useCallback(async () => {
     if (!isAdmin) return;
@@ -370,6 +387,98 @@ export default function Settings() {
                 ? "Syncing…"
                 : "Sync All Changes to GitHub"}
             </Button>
+
+            {/* Test Connection */}
+            <div className="border border-border rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">GitHub Connection</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleTestConnection}
+                    disabled={connTestState === "testing"}
+                    className="gap-1.5 h-7 text-xs"
+                  >
+                    <Wifi className={`w-3.5 h-3.5 ${connTestState === "testing" ? "animate-pulse" : ""}`} />
+                    {connTestState === "testing" ? "Testing…" : "Test Connection"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleShowDiagnostics}
+                    className="gap-1.5 h-7 text-xs"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    Logs
+                  </Button>
+                </div>
+              </div>
+
+              {connTestResult && connTestState === "done" && (
+                <div className={`rounded-lg p-3 text-xs space-y-1.5 ${connTestResult.ok ? "bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40" : "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40"}`}>
+                  <div className="flex items-center gap-2 font-semibold">
+                    {connTestResult.ok
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                      : <WifiOff className="w-3.5 h-3.5 text-red-500" />}
+                    <span>{connTestResult.ok ? "Connection successful" : "Connection failed"}</span>
+                    <span className="font-mono text-muted-foreground ml-auto">{connTestResult.latencyMs} ms</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                    <span>Token present</span>
+                    <span className={connTestResult.tokenPresent ? "text-green-600" : "text-red-500"}>
+                      {connTestResult.tokenPresent ? "✓ Yes" : "✗ No"}
+                    </span>
+                    <span>Repo reachable</span>
+                    <span className={connTestResult.repoReachable ? "text-green-600" : "text-red-500"}>
+                      {connTestResult.repoReachable ? "✓ Yes" : "✗ No"}
+                    </span>
+                    <span>Write access</span>
+                    <span className={connTestResult.writeAccess ? "text-green-600" : "text-amber-600"}>
+                      {connTestResult.writeAccess ? "✓ Yes" : "✗ No"}
+                    </span>
+                    {connTestResult.httpStatus && (
+                      <>
+                        <span>HTTP status</span>
+                        <span className="font-mono">{connTestResult.httpStatus}</span>
+                      </>
+                    )}
+                  </div>
+                  {connTestResult.error && (
+                    <p className="text-red-600 dark:text-red-400 font-mono text-[10px] break-all">{connTestResult.error}</p>
+                  )}
+                </div>
+              )}
+
+              {showDiagnostics && syncDiagnostics.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground">Recent sync attempts</p>
+                    <button onClick={() => setShowDiagnostics(false)} className="text-xs text-muted-foreground hover:text-foreground">Hide</button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {syncDiagnostics.map((d, i) => (
+                      <div key={i} className={`rounded px-2 py-1.5 text-[10px] font-mono border ${d.ok ? "bg-green-50/50 border-green-200 dark:bg-green-950/10 dark:border-green-800/30" : "bg-red-50/50 border-red-200 dark:bg-red-950/10 dark:border-red-800/30"}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={d.ok ? "text-green-600" : "text-red-500"}>{d.ok ? "✓" : "✗"}</span>
+                          <span className="font-semibold">{d.direction === "write" ? "POST" : "GET"} /api/data/{d.type}</span>
+                          <span className="text-muted-foreground">HTTP {d.httpStatus ?? "—"}</span>
+                          <span className="text-muted-foreground ml-auto">{d.latencyMs} ms</span>
+                        </div>
+                        <div className="text-muted-foreground">
+                          {new Date(d.timestamp).toLocaleTimeString()}
+                          {d.error && <span className="text-red-500 ml-2">{d.error}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {showDiagnostics && syncDiagnostics.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">No sync attempts recorded yet. Sync members or moments to see diagnostics.</p>
+              )}
+            </div>
 
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2.5">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />

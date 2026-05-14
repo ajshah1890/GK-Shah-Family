@@ -5,6 +5,8 @@ import {
   runIntegrityCheck,
   rebuildChildrenArrays,
   repairMissingLineageRoots,
+  recomputeAllGenerations,
+  repairSpouseBacklinks,
 } from "@/lib/familyTree";
 import { detectPotentialDuplicates } from "@/hooks/useFamilyStore";
 import { MergeMembersDialog } from "@/components/MergeMembersDialog";
@@ -240,6 +242,21 @@ export default function DataHealth() {
       toast.success("Children arrays rebuilt successfully");
     } catch {
       toast.error("Repair failed");
+    }
+    setRepairing(null);
+  };
+
+  const rebuildEntireTree = () => {
+    setRepairing("tree");
+    try {
+      let fixed = rebuildChildrenArrays(members);
+      fixed = repairMissingLineageRoots(fixed);
+      fixed = recomputeAllGenerations(fixed);
+      fixed = repairSpouseBacklinks(fixed);
+      importMembers(fixed);
+      toast.success("Tree rebuilt — children, lineage, generations, and spouse backlinks repaired");
+    } catch {
+      toast.error("Rebuild failed");
     }
     setRepairing(null);
   };
@@ -573,6 +590,16 @@ export default function DataHealth() {
           <CardDescription>Fix issues or navigate to related pages.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={rebuildEntireTree}
+            disabled={repairing === "tree"}
+            className="gap-2 bg-amber-700 hover:bg-amber-800 text-white"
+          >
+            <RefreshCw className={`w-4 h-4 ${repairing === "tree" ? "animate-spin" : ""}`} />
+            Rebuild Tree
+          </Button>
           <Button variant="outline" size="sm" onClick={repairChildren} disabled={repairing === "children"} className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Rebuild Children Arrays

@@ -24,7 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Upload, X, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { RelationshipCombobox } from "@/components/RelationshipCombobox";
 import { toast } from "sonner";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import {
@@ -91,6 +92,9 @@ export default function MemberForm() {
   const [duplicatesFound, setDuplicatesFound] = useState<{ member: FamilyMember; reasons: string[] }[]>([]);
   const [pendingData, setPendingData] = useState<Omit<FamilyMember, 'id'> | null>(null);
 
+  const isHydrating = useRef(false);
+  const originalRelIds = useRef<{ fatherId?: string; motherId?: string; spouseId?: string }>({});
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -138,6 +142,20 @@ export default function MemberForm() {
     if (isLoaded && isEditing) {
       const member = members.find(m => m.id === id);
       if (member) {
+        originalRelIds.current = {
+          fatherId: member.fatherId,
+          motherId: member.motherId,
+          spouseId: member.spouseId,
+        };
+        console.log("[GKShah] Editing member:", {
+          name: member.fullName,
+          "original fatherId": member.fatherId,
+          "original motherId": member.motherId,
+          "original spouseId": member.spouseId,
+          "original generationNumber": member.generationNumber,
+        });
+
+        isHydrating.current = true;
         form.reset({
           fullName: member.fullName ?? "",
           photo: (member.photo && !member.photo.startsWith("idb:")) ? member.photo : "",
@@ -177,6 +195,8 @@ export default function MemberForm() {
           generationNumber: member.generationNumber,
           siblingOrder: member.siblingOrder,
         });
+        setTimeout(() => { isHydrating.current = false; }, 0);
+
         if (member.photo && !member.photo.startsWith("idb:")) {
           setPhotoPreview(member.photo);
         }
@@ -186,13 +206,16 @@ export default function MemberForm() {
 
   const fatherId = form.watch("fatherId");
   useEffect(() => {
+    // Skip auto-generation-compute during programmatic hydration (form.reset).
+    // Only fire when the user actively changes the father field.
+    if (isHydrating.current) return;
     if (fatherId) {
       const father = members.find(m => m.id === fatherId);
       if (father?.generationNumber) {
-        form.setValue("generationNumber", father.generationNumber + 1);
-        const ordinals = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
+        const ordinals = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
         const genNum = father.generationNumber + 1;
-        form.setValue("generation", `${ordinals[genNum - 1] || genNum + 'th'} Generation`);
+        form.setValue("generationNumber", genNum);
+        form.setValue("generation", `${ordinals[genNum - 1] ?? `${genNum}th`} Generation`);
       }
     }
   }, [fatherId, members, form]);
@@ -314,6 +337,30 @@ export default function MemberForm() {
   const onSubmit = (values: FormValues) => {
     const memberData = buildMemberData(values);
 
+    // Emit diagnostics so issues are visible in the browser console
+    if (isEditing) {
+      const orig = originalRelIds.current;
+      console.log("[GKShah] Saving member:", {
+        name: memberData.fullName,
+        "saved fatherId": memberData.fatherId ?? null,
+        "saved motherId": memberData.motherId ?? null,
+        "saved spouseId": memberData.spouseId ?? null,
+        "saved generationNumber": memberData.generationNumber ?? null,
+      });
+      if (orig.fatherId && !memberData.fatherId) {
+        console.warn("[GKShah] fatherId was cleared during save:", { original: orig.fatherId });
+        toast.warning("Father relationship was removed. Re-select if this was unintentional.");
+      }
+      if (orig.motherId && !memberData.motherId) {
+        console.warn("[GKShah] motherId was cleared during save:", { original: orig.motherId });
+        toast.warning("Mother relationship was removed. Re-select if this was unintentional.");
+      }
+      if (orig.spouseId && !memberData.spouseId) {
+        console.warn("[GKShah] spouseId was cleared during save:", { original: orig.spouseId });
+        toast.warning("Spouse relationship was removed. Re-select if this was unintentional.");
+      }
+    }
+
     // Duplicate detection (skip when editing the same person)
     const dupes = detectPotentialDuplicates(
       { fullName: memberData.fullName, phone: memberData.phone, birthday: memberData.birthday },
@@ -409,13 +456,17 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Gender</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
+                          <Select
+                            onValueChange={(val) => field.onChange(val === "__unset__" ? undefined : val)}
+                            value={field.value ?? "__unset__"}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Gender" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                              <SelectItem value="__unset__">Select Gender</SelectItem>
                               <SelectItem value="Male">Male</SelectItem>
                               <SelectItem value="Female">Female</SelectItem>
                               <SelectItem value="Other">Other</SelectItem>
@@ -431,13 +482,17 @@ export default function MemberForm() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Generation</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
+                          <Select
+                            onValueChange={(val) => field.onChange(val === "__unset__" ? "" : val)}
+                            value={field.value || "__unset__"}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select Generation" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                              <SelectItem value="__unset__">Select Generation</SelectItem>
                               <SelectItem value="1st Generation">1st Generation</SelectItem>
                               <SelectItem value="2nd Generation">2nd Generation</SelectItem>
                               <SelectItem value="3rd Generation">3rd Generation</SelectItem>
@@ -503,63 +558,57 @@ export default function MemberForm() {
                 )}
               />
 
-              {/* Relationship fields - Father, Mother, Spouse dropdowns */}
+              {/* Relationship fields - searchable comboboxes for large family datasets */}
               <div className="md:col-span-2 space-y-4 pt-4 border-t border-border">
                 <h4 className="text-sm font-semibold text-muted-foreground">Family Relationships</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField control={form.control} name="fatherId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Father</FormLabel>
-                      <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select father..." /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id?.trim() && m.id !== id && m.gender !== "Female").map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <RelationshipCombobox
+                          value={field.value ?? ""}
+                          onChange={(val) => field.onChange(val)}
+                          members={members}
+                          placeholder="Select father…"
+                          excludeId={id}
+                          excludeGender="Female"
+                        />
+                      </FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="motherId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Mother</FormLabel>
-                      <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select mother..." /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id?.trim() && m.id !== id && m.gender !== "Male").map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <RelationshipCombobox
+                          value={field.value ?? ""}
+                          onChange={(val) => field.onChange(val)}
+                          members={members}
+                          placeholder="Select mother…"
+                          excludeId={id}
+                          excludeGender="Male"
+                        />
+                      </FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="spouseId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Spouse</FormLabel>
-                      <Select onValueChange={(val) => {
-                        const resolved = val === "__none__" ? "" : val;
-                        field.onChange(resolved);
-                        // Auto-fill spouseName from selection
-                        const spouse = members.find(m => m.id === resolved);
-                        if (spouse) form.setValue("spouseName", spouse.fullName);
-                        if (val === "__none__") form.setValue("spouseName", "");
-                      }} value={field.value || "__none__"}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select spouse..." /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {members.filter(m => m.id?.trim() && m.id !== id).map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.fullName || m.id}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <RelationshipCombobox
+                          value={field.value ?? ""}
+                          onChange={(val) => {
+                            field.onChange(val);
+                            const spouse = members.find(m => m.id === val);
+                            if (spouse) form.setValue("spouseName", spouse.fullName);
+                            if (!val) form.setValue("spouseName", "");
+                          }}
+                          members={members}
+                          placeholder="Select spouse…"
+                          excludeId={id}
+                        />
+                      </FormControl>
                     </FormItem>
                   )} />
                 </div>
@@ -868,13 +917,17 @@ export default function MemberForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Blood Group</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <Select
+                        onValueChange={(val) => field.onChange(val === "__unset__" ? "" : val)}
+                        value={field.value || "__unset__"}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select Blood Group" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="__unset__">Select Blood Group</SelectItem>
                           {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(bg => (
                             <SelectItem key={bg} value={bg}>{bg}</SelectItem>
                           ))}

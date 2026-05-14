@@ -1,0 +1,5 @@
+dist/
+node_modules/
+# tsc-compiled api files (Vercel compiles from .ts source itself)
+api/**/*.js
+api/**/*.js.map

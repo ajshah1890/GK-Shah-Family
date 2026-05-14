@@ -145,15 +145,38 @@ export function useMomentsStore() {
           }
 
           // GitHub returned 0 moments.
+          // ─── CRITICAL: never let an empty GitHub response wipe local data. ───
+
+          // Guard A — debug toggle
           if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
             logHydration(
-              `Moments: GitHub hydration disabled — keeping ${local.length} local moments (remote returned 0)`
+              `Moments: GitHub hydration disabled — keeping ${local.length} local moment${local.length !== 1 ? "s" : ""} (remote returned 0)`
             );
             if (!cancelled) setIsLoaded(true);
             return;
           }
-          // Legitimately empty — show empty, do NOT fall back to local
-          logHydration("Moments loaded from: GitHub (returned 0 moments — empty)");
+
+          // Guard B — save in progress: don't touch state
+          if (_isMomentSaving) {
+            logHydration(
+              `Moments: GitHub returned 0 but save is in progress — preserving local state (${local.length} moment${local.length !== 1 ? "s" : ""})`
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+
+          // Guard C — local data exists: keep it, never overwrite with empty
+          if (local.length > 0) {
+            logHydration(
+              `Moments: GitHub returned 0 — preserving ${local.length} local-only moment${local.length !== 1 ? "s" : ""} ` +
+              `(remote is empty, local is authoritative)`
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+
+          // Both GitHub and localStorage are empty — genuinely fresh start.
+          logHydration("Moments: GitHub returned 0 and localStorage is also empty — starting fresh");
           if (!cancelled) {
             setMoments([]);
             setIsLoaded(true);

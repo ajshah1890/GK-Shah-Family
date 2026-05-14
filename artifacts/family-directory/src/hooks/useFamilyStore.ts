@@ -86,6 +86,14 @@ function smartMergeMembers(local: FamilyMember[], remote: FamilyMember[]): {
     if (!loc) { merged.push(rem);  remoteOnly++; continue; }
     const localMs  = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
     const remoteMs = rem.updatedAt ? new Date(rem.updatedAt).getTime() : 0;
+    // TASK 4 — log updatedAt comparison so we can verify local always wins after a fresh edit
+    if (localMs < remoteMs) {
+      // Remote wins — log so we can catch any unexpected cases
+      console.warn(
+        `[GKShah] smartMerge REMOTE WINS for ${loc.fullName} (${id}):`,
+        { localUpdatedAt: loc.updatedAt, remoteUpdatedAt: rem.updatedAt, remoteAheadByMs: remoteMs - localMs }
+      );
+    }
     if (localMs >= remoteMs) { merged.push(loc); localWins++;  }
     else                     { merged.push(rem); remoteWins++; }
   }
@@ -347,15 +355,45 @@ export function useFamilyStore() {
           }
 
           // GitHub returned 0 members.
+          // ─── CRITICAL: never let an empty GitHub response wipe local data. ───
+          // GitHub returning 0 is normal for new setups, post-reset, or when the
+          // remote repo was cleared. The local store is the user's working copy —
+          // it must survive a 0-member remote response.
+
+          // Guard A — debug toggle
           if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
             logHydration(
-              `Members: GitHub hydration disabled — keeping ${local.length} local members (remote returned 0)`
+              `Members: GitHub hydration disabled — keeping ${local.length} local member${local.length !== 1 ? "s" : ""} (remote returned 0)`
             );
             if (!cancelled) setIsLoaded(true);
             return;
           }
-          // Legitimately empty directory (e.g. post-reset). DO NOT fall back to local data.
-          logHydration("Members loaded from: GitHub (returned 0 members — directory is empty)");
+
+          // Guard B — save in progress: don't touch state
+          if (_isSaving) {
+            logHydration(
+              `Members: GitHub returned 0 but save is in progress — preserving local state (${local.length} member${local.length !== 1 ? "s" : ""})`
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+
+          // Guard C — local data exists: keep it, never overwrite with empty
+          if (local.length > 0) {
+            logHydration(
+              `Members: GitHub returned 0 — preserving ${local.length} local-only member${local.length !== 1 ? "s" : ""} ` +
+              `(remote is empty, local is authoritative)`
+            );
+            console.log(
+              "[GKShah] HYDRATION 0-member guard fired:",
+              local.map(m => ({ id: m.id, name: m.fullName, updatedAt: m.updatedAt }))
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+
+          // Both GitHub and localStorage are empty — genuinely fresh start.
+          logHydration("Members: GitHub returned 0 and localStorage is also empty — starting fresh");
           if (!cancelled) {
             setMembers([]);
             setIsLoaded(true);
@@ -490,6 +528,23 @@ export function useFamilyStore() {
 
       const saved = next.find(m => m.id === id)!;
       console.log('[GKShah] addMember END —', id, saved?.fullName);
+
+      // TASK 2 — delayed verify: confirm localStorage still has the member 2 s later
+      // (catches any hydration overwrite that happens after the save returns)
+      setTimeout(() => {
+        try {
+          const raw2 = localStorage.getItem(STORAGE_KEY);
+          const parsed2 = raw2 ? JSON.parse(raw2) : null;
+          const list2: Array<{ id: string; fullName?: string; updatedAt?: string }> =
+            Array.isArray(parsed2) ? parsed2 : (parsed2?.members ?? []);
+          const check = list2.find(m => m.id === id);
+          console.log(
+            '[GKShah] addMember +2s LOCALSTORAGE VERIFY',
+            check ? `✓ still present — ${check.fullName} updatedAt=${check.updatedAt}` : `❌ GONE — was wiped after save!`
+          );
+        } catch { /* noop */ }
+      }, 2000);
+
       return { member: saved };
     } catch (err) {
       console.error('[GKShah] addMember FAILURE (exception):', err);
@@ -559,6 +614,26 @@ export function useFamilyStore() {
       }
 
       console.log('[GKShah] updateMember END —', id, updated.fullName);
+
+      // TASK 2 — delayed verify: confirm localStorage still has the updated member 2 s later
+      setTimeout(() => {
+        try {
+          const raw2 = localStorage.getItem(STORAGE_KEY);
+          const parsed2 = raw2 ? JSON.parse(raw2) : null;
+          const list2: Array<{ id: string; fullName?: string; birthday?: string; gender?: string; bloodGroup?: string; updatedAt?: string }> =
+            Array.isArray(parsed2) ? parsed2 : (parsed2?.members ?? []);
+          const check = list2.find(m => m.id === id);
+          if (check) {
+            console.log(
+              '[GKShah] updateMember +2s LOCALSTORAGE VERIFY ✓ still present',
+              { id, fullName: check.fullName, birthday: check.birthday, gender: check.gender, bloodGroup: check.bloodGroup, updatedAt: check.updatedAt }
+            );
+          } else {
+            console.error('[GKShah] updateMember +2s LOCALSTORAGE VERIFY ❌ GONE — member was wiped after save!', { id });
+          }
+        } catch { /* noop */ }
+      }, 2000);
+
       return {};
     } catch (err) {
       console.error('[GKShah] updateMember FAILURE (exception):', err);

@@ -1,0 +1,124 @@
+Focus ONLY on member edit persistence + moments save flow.
+
+GitHub sync is now working correctly.
+
+Current bugs:
+
+1. Member edit form forgets fields after save/reopen:
+
+* gender
+* generation
+* birthday
+* blood group
+
+2. Birthday specifically does not persist after save.
+
+3. Saving Moments exits immediately / closes unexpectedly.
+
+DO NOT modify sync infrastructure anymore.
+
+====================================
+MEMBER EDIT FIXES
+=================
+
+Root cause is likely mismatch between:
+
+* form state
+* schema
+* buildMemberData()
+* persisted member object
+* hydration/reset logic
+
+Tasks:
+
+1. Trace full lifecycle for:
+   gender
+   generation
+   birthday
+   bloodGroup
+
+From:
+hydrate -> form.reset -> edit -> submit -> buildMemberData -> save -> reload
+
+2. Add console logs:
+   HYDRATED MEMBER
+   FORM VALUES BEFORE SAVE
+   FINAL PAYLOAD SAVED
+
+3. Ensure buildMemberData() includes:
+   birthday
+   gender
+   generationNumber
+   bloodGroup
+
+and NEVER drops existing values accidentally.
+
+4. Ensure undefined/null cleaning logic does NOT remove valid falsy values.
+
+5. Birthday fix:
+   Normalize all birthday values to:
+   YYYY-MM-DD
+
+before persistence.
+
+6. Ensure form.reset() correctly hydrates:
+   birthday
+   gender
+   bloodGroup
+   generation
+
+7. Ensure dirtyFields logic does not prevent persistence for Select fields.
+
+8. Remove any:
+   || undefined
+   patterns for these fields.
+
+Use nullish coalescing instead:
+?? existingValue
+
+====================================
+MOMENTS SAVE BUG
+================
+
+Current issue:
+Moment modal/page exits immediately during save.
+
+Tasks:
+
+1. Add logs:
+   "Saving moment..."
+   "Moment payload"
+   "Moment save success"
+   "Moment save error"
+
+2. Check for:
+
+* navigation firing before await completes
+* form reset during submit
+* optimistic close before persistence
+
+3. Ensure:
+   await saveMoment()
+
+completes BEFORE:
+navigate()
+closeModal()
+reset()
+
+4. Disable save button during submit.
+
+5. Add toast on success/failure.
+
+====================================
+IMPORTANT
+=========
+
+Do NOT touch:
+
+* GitHub sync
+* Vercel config
+* API routes
+* family tree rendering
+
+Goal:
+Edits must persist reliably after reload and moments must save correctly without exiting early.

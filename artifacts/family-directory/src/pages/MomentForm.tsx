@@ -110,6 +110,13 @@ export default function MomentForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventDate) { toast.error("Event date is required"); return; }
+    console.log("[GKShah] Saving moment...", {
+      caption,
+      eventDate,
+      eventType,
+      taggedMemberIds,
+      photoCount: pendingPhotos.length,
+    });
     setSaving(true);
     try {
       await createMoment({
@@ -122,9 +129,11 @@ export default function MomentForm() {
         eventType,
         favorite,
       });
+      console.log("[GKShah] Moment save success — navigating to /moments");
       toast.success("Memory saved to your family archive!");
       setLocation("/moments");
     } catch (err) {
+      console.error("[GKShah] Moment save error", err);
       toast.error("Failed to save moment");
     } finally {
       setSaving(false);

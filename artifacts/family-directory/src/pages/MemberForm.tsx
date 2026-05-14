@@ -99,6 +99,8 @@ export default function MemberForm() {
   const originalValues = useRef<{
     fatherId?: string; motherId?: string; spouseId?: string;
     gender?: "Male" | "Female" | "Other"; bloodGroup?: string;
+    birthday?: string; anniversary?: string;
+    generation?: string; generationNumber?: number; siblingOrder?: number;
   }>({});
   // Backward-compat alias used in a few places below
   const originalRelIds = originalValues;
@@ -160,14 +162,31 @@ export default function MemberForm() {
 
     hydrated.current = true;
 
-    // Snapshot DB values; used as fallback in buildMemberData if a field silently fails to hydrate
+    // Snapshot DB values; used as fallback in buildMemberData if a field silently fails to hydrate.
+    // Normalize dates to YYYY-MM-DD so the snapshot matches the form's date input format.
     originalValues.current = {
-      fatherId:   member.fatherId,
-      motherId:   member.motherId,
-      spouseId:   member.spouseId,
-      gender:     member.gender,
-      bloodGroup: member.bloodGroup,
+      fatherId:         member.fatherId,
+      motherId:         member.motherId,
+      spouseId:         member.spouseId,
+      gender:           member.gender,
+      bloodGroup:       member.bloodGroup,
+      birthday:         member.birthday?.slice(0, 10),
+      anniversary:      member.anniversary?.slice(0, 10),
+      generation:       member.generation,
+      generationNumber: member.generationNumber,
+      siblingOrder:     member.siblingOrder,
     };
+
+    console.log("[GKShah] HYDRATED MEMBER", {
+      id,
+      fullName: member.fullName,
+      birthday: member.birthday,
+      birthdayNormalized: member.birthday?.slice(0, 10),
+      gender: member.gender,
+      bloodGroup: member.bloodGroup,
+      generation: member.generation,
+      generationNumber: member.generationNumber,
+    });
 
     isHydrating.current = true;
     form.reset({
@@ -176,8 +195,9 @@ export default function MemberForm() {
       gender: member.gender,
       generation: member.generation ?? "",
       nativePlace: member.nativePlace ?? "",
-      birthday: member.birthday ?? "",
-      anniversary: member.anniversary ?? "",
+      // Normalize to YYYY-MM-DD — date inputs silently show empty for ISO datetime strings
+      birthday: member.birthday?.slice(0, 10) ?? "",
+      anniversary: member.anniversary?.slice(0, 10) ?? "",
       address: member.address ?? "",
       mapsLink: member.mapsLink ?? "",
       city: member.city ?? "",
@@ -333,51 +353,112 @@ export default function MemberForm() {
   };
 
   const buildMemberData = (values: FormValues) => {
-    const { childrenNamesStr, photo, ...rest } = values;
+    // Pull out fields we handle explicitly so they are not double-included via ...rest
+    const {
+      childrenNamesStr,
+      photo,
+      birthday:         rawBirthday,
+      anniversary:      rawAnniversary,
+      gender:           _gender,
+      bloodGroup:       _bloodGroup,
+      generation:       _generation,
+      generationNumber: _generationNumber,
+      fatherId:         _fatherId,
+      motherId:         _motherId,
+      spouseId:         _spouseId,
+      siblingOrder:     _siblingOrder,
+      ...rest
+    } = values;
+
     const finalPhoto = photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(values.fullName)}`;
     const orig    = originalValues.current;
     const cleared = userExplicitlyClearedRels.current;
-    const dirty   = form.formState.dirtyFields;
 
     // ── Relationship fields ───────────────────────────────────────────────────
-    // Rule: if the form value is empty AND the user did NOT explicitly click "None",
-    // fall back to the original DB value.  This survives any hydration timing failure.
-    const fatherIdFinal = values.fatherId
-      ? values.fatherId
+    // If the form value is empty AND the user did NOT explicitly click "None",
+    // fall back to the original DB value to survive any hydration timing failure.
+    const fatherIdFinal = _fatherId
+      ? _fatherId
       : cleared.has("fatherId") ? undefined : (orig.fatherId ?? undefined);
 
-    const motherIdFinal = values.motherId
-      ? values.motherId
+    const motherIdFinal = _motherId
+      ? _motherId
       : cleared.has("motherId") ? undefined : (orig.motherId ?? undefined);
 
-    const spouseIdFinal = values.spouseId
-      ? values.spouseId
+    const spouseIdFinal = _spouseId
+      ? _spouseId
       : cleared.has("spouseId") ? undefined : (orig.spouseId ?? undefined);
 
-    // ── Gender & blood group ──────────────────────────────────────────────────
-    // Only overwrite with form value if the user actually touched the field (dirty).
-    // If not dirty and the form value is missing, fall back to the original.
+    // ── Gender ────────────────────────────────────────────────────────────────
+    // Use form value when present; fall back to original snapshot so a hydration
+    // race can never silently clear an existing gender.
     const genderFinal: "Male" | "Female" | "Other" | undefined =
-      values.gender ?? (!dirty.gender ? orig.gender : undefined);
+      _gender ?? orig.gender;
 
+    // ── Blood group ───────────────────────────────────────────────────────────
+    // Same pattern: non-empty form value wins; empty falls back to original.
     const bloodGroupFinal: string | undefined =
-      values.bloodGroup || (!dirty.bloodGroup ? (orig.bloodGroup ?? undefined) : undefined) || undefined;
+      (_bloodGroup !== undefined && _bloodGroup !== "")
+        ? _bloodGroup
+        : (orig.bloodGroup ?? undefined);
+
+    // ── Birthday / anniversary ────────────────────────────────────────────────
+    // <input type="date"> requires YYYY-MM-DD.  Stored ISO datetimes
+    // (e.g. "1980-05-15T00:00:00.000Z") make the input render empty, causing the
+    // empty string to overwrite the real value on save.  Normalize here AND fall
+    // back to the original snapshot when the form value is blank.
+    const normalizeDate = (raw: string | undefined, fallback: string | undefined): string | undefined => {
+      const t = raw?.trim();
+      if (t) return t.slice(0, 10);
+      return fallback ?? undefined;
+    };
+
+    const birthdayFinal    = normalizeDate(rawBirthday,    orig.birthday);
+    const anniversaryFinal = normalizeDate(rawAnniversary, orig.anniversary);
+
+    // ── Generation ────────────────────────────────────────────────────────────
+    const generationFinal: string | undefined =
+      (_generation !== undefined && _generation !== "")
+        ? _generation
+        : (orig.generation ?? undefined);
+
+    const generationNumberFinal: number | undefined =
+      _generationNumber ?? orig.generationNumber;
+
+    const siblingOrderFinal: number | undefined =
+      _siblingOrder ?? orig.siblingOrder;
 
     return {
       ...rest,
-      photo: finalPhoto,
-      gender: genderFinal,
-      bloodGroup: bloodGroupFinal,
-      childrenNames: childrenNamesStr ? childrenNamesStr.split(",").map(s => s.trim()).filter(Boolean) : [],
+      photo:            finalPhoto,
+      birthday:         birthdayFinal,
+      anniversary:      anniversaryFinal,
+      gender:           genderFinal,
+      bloodGroup:       bloodGroupFinal,
+      generation:       generationFinal,
+      generationNumber: generationNumberFinal,
+      siblingOrder:     siblingOrderFinal,
+      childrenNames:    childrenNamesStr
+        ? childrenNamesStr.split(",").map(s => s.trim()).filter(Boolean)
+        : [],
       fatherId:  fatherIdFinal,
       motherId:  motherIdFinal,
       spouseId:  spouseIdFinal,
-      generationNumber: values.generationNumber,
-      siblingOrder: values.siblingOrder,
     };
   };
 
   const performSave = (memberData: Omit<FamilyMember, 'id'>) => {
+    console.log("[GKShah] FINAL PAYLOAD SAVED", {
+      birthday:         memberData.birthday,
+      anniversary:      memberData.anniversary,
+      gender:           memberData.gender,
+      bloodGroup:       memberData.bloodGroup,
+      generation:       memberData.generation,
+      generationNumber: memberData.generationNumber,
+      fatherId:         memberData.fatherId,
+      motherId:         memberData.motherId,
+      spouseId:         memberData.spouseId,
+    });
     if (isEditing && id) {
       const result = updateMember(id, memberData);
       if (result.error) { toast.error(result.error); return; }
@@ -392,6 +473,14 @@ export default function MemberForm() {
   };
 
   const onSubmit = (values: FormValues) => {
+    console.log("[GKShah] FORM VALUES BEFORE SAVE", {
+      birthday:         values.birthday,
+      anniversary:      values.anniversary,
+      gender:           values.gender,
+      bloodGroup:       values.bloodGroup,
+      generation:       values.generation,
+      generationNumber: values.generationNumber,
+    });
     const memberData = buildMemberData(values);
 
     // Pre-save integrity: warn if a relationship is being removed

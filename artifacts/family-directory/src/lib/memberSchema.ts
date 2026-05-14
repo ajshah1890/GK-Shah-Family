@@ -34,6 +34,8 @@ export const MEMBER_SCHEMA: FieldDef[] = [
   { key: "motherId",         label: "Mother ID",              aliases: ["mother id", "motherid", "mom id"] },
   { key: "spouseId",         label: "Spouse ID",              aliases: ["spouse id", "spouseid", "partner id"] },
   { key: "spouseName",       label: "Spouse Name",            aliases: ["spouse", "spouse name", "partner name", "wife", "husband"] },
+  { key: "fatherName",       label: "Father Name (import)",   aliases: ["father name", "fathername", "father", "dad", "papa", "pitaji"] },
+  { key: "motherName",       label: "Mother Name (import)",   aliases: ["mother name", "mothername", "mother", "mom", "mummy", "mamma", "mata"] },
   { key: "generationNumber", label: "Generation Number",      aliases: ["generation number", "generationnumber", "gen number", "gen no"] },
   { key: "generation",       label: "Generation Label",       aliases: ["generation", "generation label"] },
   { key: "siblingOrder",     label: "Sibling Birth Order",    aliases: ["sibling order", "siblingorder", "birth order"] },

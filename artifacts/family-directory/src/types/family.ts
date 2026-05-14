@@ -27,6 +27,8 @@ export interface FamilyMember {
   mainFamilyBranch?: string;
   subFamilyBranch?: string;
   spouseName?: string;
+  fatherName?: string;
+  motherName?: string;
   childrenNames?: string[];
   hobbies?: string;
   skills?: string;

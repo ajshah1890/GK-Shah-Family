@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
@@ -16,16 +18,20 @@ import {
   TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  FileSpreadsheet, Upload, Download,
-  ArrowRight, CheckCircle2,
+  FileSpreadsheet, Upload, Download, ArrowRight, CheckCircle2,
+  AlertTriangle, AlertCircle, Info, ChevronLeft, RefreshCw,
+  Users, Link2, LinkIcon, SkipForward, Copy, CircleX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FamilyMember } from "@/types/family";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { MEMBER_SCHEMA, IMPORT_ALIAS_MAP, EXPORT_COLUMNS } from "@/lib/memberSchema";
+import { runImport, ImportResult, ImportOptions, WarnType } from "@/lib/importEngine";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+const DUPE_IMPORT_KEY = "gkshah_last_import";
 
 function autoMap(rawHeaders: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -42,48 +48,74 @@ function buildExportRow(m: FamilyMember): Record<string, unknown> {
     const val = m[key];
     if (key === "childrenNames" && Array.isArray(val)) {
       row[label] = (val as string[]).join(", ");
-    } else if (val !== undefined && val !== null && val !== "") {
-      row[label] = val;
     } else {
-      row[label] = "";
+      row[label] = val ?? "";
     }
   }
   return row;
 }
 
+interface WarnMeta { icon: React.ReactNode; color: string; label: string }
+function warnMeta(type: WarnType): WarnMeta {
+  switch (type) {
+    case "circular_ancestry": return { icon: <CircleX className="w-3.5 h-3.5" />, color: "text-destructive", label: "Circular ancestry" };
+    case "duplicate_in_file": return { icon: <Copy className="w-3.5 h-3.5" />, color: "text-orange-600 dark:text-orange-400", label: "Duplicate in file" };
+    case "duplicate_in_store": return { icon: <Copy className="w-3.5 h-3.5" />, color: "text-yellow-600 dark:text-yellow-400", label: "Already in directory" };
+    case "missing_father": return { icon: <AlertTriangle className="w-3.5 h-3.5" />, color: "text-orange-600 dark:text-orange-400", label: "Missing father" };
+    case "missing_mother": return { icon: <AlertTriangle className="w-3.5 h-3.5" />, color: "text-orange-600 dark:text-orange-400", label: "Missing mother" };
+    case "unresolved_spouse": return { icon: <AlertCircle className="w-3.5 h-3.5" />, color: "text-yellow-600 dark:text-yellow-400", label: "Unresolved spouse" };
+    case "orphan": return { icon: <Info className="w-3.5 h-3.5" />, color: "text-muted-foreground", label: "Isolated member" };
+  }
+}
+
 // ─── component ────────────────────────────────────────────────────────────────
+
+type Step = "upload" | "mapping" | "preview";
 
 export default function Import() {
   const { members, importMembers } = useFamilyStore();
   const { isAdmin } = useAdminMode();
 
+  const [step, setStep] = useState<Step>("upload");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<unknown[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [step, setStep] = useState<1 | 2>(1);
   const [fileName, setFileName] = useState("");
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update">("skip");
+  const [replaceAll, setReplaceAll] = useState(false);
+  const [analysis, setAnalysis] = useState<ImportResult | null>(null);
+  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [dupeImportWarning, setDupeImportWarning] = useState(false);
 
   const csvFileRef = useRef<HTMLInputElement>(null);
   const excelFileRef = useRef<HTMLInputElement>(null);
 
-  const processFile = (rawHeaders: string[], rawRows: unknown[][]) => {
+  // ── File parsing ────────────────────────────────────────────────────────────
+
+  const processFile = (rawHeaders: string[], rawRows: unknown[][], name: string) => {
     setHeaders(rawHeaders);
     setMapping(autoMap(rawHeaders));
     setRows(rawRows);
-    setStep(2);
+    setFileName(name);
+
+    // Duplicate-import detection
+    const fingerprint = `${name}::${rawRows.length}`;
+    const last = localStorage.getItem(DUPE_IMPORT_KEY);
+    setDupeImportWarning(last === fingerprint);
+
+    setStep("mapping");
   };
 
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileName(file.name);
     Papa.parse(file, {
       skipEmptyLines: true,
       complete: (results) => {
         const data = results.data as string[][];
         if (data.length < 2) { toast.error("File is empty"); return; }
-        processFile(data[0], data.slice(1));
+        processFile(data[0], data.slice(1), file.name);
       },
       error: (err) => toast.error(`CSV parse error: ${err.message}`),
     });
@@ -92,7 +124,6 @@ export default function Import() {
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
@@ -100,7 +131,7 @@ export default function Import() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
         if (data.length < 2) { toast.error("File is empty"); return; }
-        processFile(data[0] as string[], data.slice(1) as unknown[][]);
+        processFile(data[0] as string[], data.slice(1) as unknown[][], file.name);
       } catch {
         toast.error("Could not read Excel file");
       }
@@ -109,73 +140,63 @@ export default function Import() {
   };
 
   const cancelImport = () => {
-    setStep(1); setHeaders([]); setRows([]); setMapping({}); setFileName("");
+    setStep("upload");
+    setHeaders([]); setRows([]); setMapping({}); setFileName("");
+    setAnalysis(null); setReplaceAll(false); setDupeImportWarning(false);
     if (csvFileRef.current) csvFileRef.current.value = "";
     if (excelFileRef.current) excelFileRef.current.value = "";
   };
 
-  const executeImport = () => {
-    const nameField = Object.values(mapping).find(v => v === "fullName");
-    if (!nameField) {
+  // ── Analysis (dry run) ──────────────────────────────────────────────────────
+
+  const runAnalysis = () => {
+    if (!Object.values(mapping).includes("fullName")) {
       toast.error("Map at least one column to 'Full Name'");
       return;
     }
-
-    const existingByName = new Map(members.map(m => [m.fullName.toLowerCase(), m]));
-    const toAdd: FamilyMember[] = [];
-    const toUpdate: FamilyMember[] = [];
-    const seenNames = new Set<string>();
-
-    rows.forEach(row => {
-      const arr = row as unknown[];
-      const data: Record<string, unknown> = { id: crypto.randomUUID(), addedAt: new Date().toISOString() };
-      headers.forEach((h, i) => {
-        const field = mapping[h];
-        if (!field || arr[i] === undefined || arr[i] === "") return;
-        if (field === "childrenNames") {
-          data[field] = String(arr[i]).split(",").map(s => s.trim()).filter(Boolean);
-        } else if (field === "generationNumber" || field === "siblingOrder") {
-          data[field] = Number(arr[i]) || undefined;
-        } else {
-          data[field] = String(arr[i]).trim();
-        }
-      });
-
-      if (!data.fullName) return;
-      const nameLower = String(data.fullName).toLowerCase();
-      if (seenNames.has(nameLower)) return;
-      seenNames.add(nameLower);
-
-      const existing = existingByName.get(nameLower);
-      if (existing) {
-        if (duplicateMode === "update") {
-          toUpdate.push({ ...existing, ...data, id: existing.id, addedAt: existing.addedAt } as unknown as FamilyMember);
-        }
-        // else skip
-      } else {
-        toAdd.push(data as unknown as FamilyMember);
+    setIsAnalysing(true);
+    setTimeout(() => {
+      try {
+        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: true };
+        const result = runImport(rows, headers, mapping, members, opts);
+        setAnalysis(result);
+        setStep("preview");
+      } catch (err) {
+        toast.error(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setIsAnalysing(false);
       }
-    });
+    }, 50); // yield to render spinner
+  };
 
-    const merged = members.map(m => {
-      const updated = toUpdate.find(u => u.id === m.id);
-      return updated ?? m;
-    });
+  // ── Execute import ──────────────────────────────────────────────────────────
 
-    importMembers([...merged, ...toAdd]);
+  const executeImport = () => {
+    setIsImporting(true);
+    setTimeout(() => {
+      try {
+        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: false };
+        const result = runImport(rows, headers, mapping, members, opts);
 
-    const parts = [];
-    if (toAdd.length > 0) parts.push(`${toAdd.length} added`);
-    if (toUpdate.length > 0) parts.push(`${toUpdate.length} updated`);
-    const skippedCount = rows.filter(r => {
-      const arr = r as unknown[];
-      const idx = headers.indexOf(Object.keys(mapping).find(k => mapping[k] === "fullName") ?? "");
-      return idx >= 0 && arr[idx] && existingByName.has(String(arr[idx]).toLowerCase()) && duplicateMode === "skip";
-    }).length;
-    if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
+        importMembers(result.members);
 
-    toast.success(`Import complete: ${parts.join(", ") || "nothing changed"}`);
-    cancelImport();
+        // Record fingerprint to detect duplicate imports next time
+        localStorage.setItem(DUPE_IMPORT_KEY, `${fileName}::${rows.length}`);
+
+        const { newMembers, updatedMembers, skippedMembers, relationshipsResolved } = result.stats;
+        const parts: string[] = [];
+        if (newMembers > 0) parts.push(`${newMembers} added`);
+        if (updatedMembers > 0) parts.push(`${updatedMembers} updated`);
+        if (skippedMembers > 0) parts.push(`${skippedMembers} skipped`);
+        if (relationshipsResolved > 0) parts.push(`${relationshipsResolved} relationships linked`);
+        toast.success(`Import complete: ${parts.join(", ") || "nothing changed"}`);
+
+        cancelImport();
+      } catch (err) {
+        toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+        setIsImporting(false);
+      }
+    }, 50);
   };
 
   // ── Export ──────────────────────────────────────────────────────────────────
@@ -196,13 +217,7 @@ export default function Import() {
   const exportExcel = () => {
     const data = members.map(buildExportRow);
     const ws = XLSX.utils.json_to_sheet(data);
-
-    // Auto column widths (rough)
-    const colWidths = EXPORT_COLUMNS.map(({ label }) => ({
-      wch: Math.max(label.length + 2, 14),
-    }));
-    ws["!cols"] = colWidths;
-
+    ws["!cols"] = EXPORT_COLUMNS.map(({ label }) => ({ wch: Math.max(label.length + 2, 14) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Directory");
     XLSX.writeFile(wb, `gkshah-directory-${new Date().toISOString().split("T")[0]}.xlsx`);
@@ -220,7 +235,7 @@ export default function Import() {
     );
   }
 
-  // ── UI ──────────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
@@ -231,7 +246,8 @@ export default function Import() {
         </p>
       </div>
 
-      {step === 1 ? (
+      {/* ── Step 1: Upload ── */}
+      {step === "upload" && (
         <Tabs defaultValue="excel" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="excel">Import Excel</TabsTrigger>
@@ -239,13 +255,13 @@ export default function Import() {
             <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
 
-          {/* ── Excel import ── */}
           <TabsContent value="excel" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif">Import from Excel (.xlsx)</CardTitle>
                 <CardDescription>
                   First row must be column headers. Columns are auto-matched to member fields.
+                  Use <strong>Father Name</strong> / <strong>Mother Name</strong> columns for automatic tree linking.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border rounded-xl m-6 bg-muted/20">
@@ -254,27 +270,20 @@ export default function Import() {
                 <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
                   Use the exported template for guaranteed column matching.
                 </p>
-                <input
-                  type="file" accept=".xlsx,.xls" className="hidden"
-                  ref={excelFileRef} onChange={handleExcelUpload}
-                />
-                <Button
-                  onClick={() => excelFileRef.current?.click()}
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-                >
+                <input type="file" accept=".xlsx,.xls" className="hidden" ref={excelFileRef} onChange={handleExcelUpload} />
+                <Button onClick={() => excelFileRef.current?.click()} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
                   <Upload className="w-4 h-4" /> Choose Excel File
                 </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* ── CSV import ── */}
           <TabsContent value="csv" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif">Import from CSV</CardTitle>
                 <CardDescription>
-                  First row must be column headers. Columns are auto-matched to member fields.
+                  UTF-8 encoded, comma-separated. First row = headers.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-border rounded-xl m-6 bg-muted/20">
@@ -283,10 +292,7 @@ export default function Import() {
                 <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
                   UTF-8 encoded, comma-separated. First row = headers.
                 </p>
-                <input
-                  type="file" accept=".csv" className="hidden"
-                  ref={csvFileRef} onChange={handleCSVUpload}
-                />
+                <input type="file" accept=".csv" className="hidden" ref={csvFileRef} onChange={handleCSVUpload} />
                 <Button onClick={() => csvFileRef.current?.click()} className="gap-2">
                   <Upload className="w-4 h-4" /> Choose CSV File
                 </Button>
@@ -294,53 +300,35 @@ export default function Import() {
             </Card>
           </TabsContent>
 
-          {/* ── Export ── */}
           <TabsContent value="export" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif">Export Directory Data</CardTitle>
                 <CardDescription>
                   Downloads all {members.length} members with {EXPORT_COLUMNS.length} fields each.
-                  Photos are excluded (too large for spreadsheets). Relationship IDs are included.
+                  Photos are excluded (too large for spreadsheets).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-4">
-                  <Button
-                    onClick={exportExcel}
-                    variant="outline"
-                    className="flex-1 py-8 h-auto gap-3 flex-col text-green-700 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-900 dark:hover:bg-green-950"
-                  >
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button onClick={exportExcel} variant="outline" className="flex-1 py-8 h-auto gap-3 flex-col text-green-700 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-900 dark:hover:bg-green-950">
                     <Download className="w-6 h-6" />
                     <span>Download as Excel</span>
-                    <span className="text-xs text-muted-foreground font-normal">
-                      Best for editing & re-importing
-                    </span>
+                    <span className="text-xs text-muted-foreground font-normal">Best for editing & re-importing</span>
                   </Button>
-                  <Button
-                    onClick={exportCSV}
-                    variant="outline"
-                    className="flex-1 py-8 h-auto gap-3 flex-col"
-                  >
+                  <Button onClick={exportCSV} variant="outline" className="flex-1 py-8 h-auto gap-3 flex-col">
                     <Download className="w-6 h-6" />
                     <span>Download as CSV</span>
-                    <span className="text-xs text-muted-foreground font-normal">
-                      Best for sharing / backup
-                    </span>
+                    <span className="text-xs text-muted-foreground font-normal">Best for sharing / backup</span>
                   </Button>
                 </div>
-
-                {/* Column reference */}
-                <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border">
                   <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
                     Exported columns ({EXPORT_COLUMNS.length})
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {EXPORT_COLUMNS.map(c => (
-                      <span
-                        key={c.key}
-                        className="text-[10px] bg-card border border-border rounded px-1.5 py-0.5 text-muted-foreground"
-                      >
+                      <span key={c.key} className="text-[10px] bg-card border border-border rounded px-1.5 py-0.5 text-muted-foreground">
                         {c.label}
                       </span>
                     ))}
@@ -350,60 +338,76 @@ export default function Import() {
             </Card>
           </TabsContent>
         </Tabs>
-      ) : (
-        /* ── Column mapping step ── */
+      )}
+
+      {/* ── Step 2: Column mapping ── */}
+      {step === "mapping" && (
         <Card className="animate-in fade-in zoom-in-95">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <CardTitle className="font-serif">Map Columns</CardTitle>
-                <CardDescription>
-                  {fileName} · {rows.length} rows ·{" "}
-                  {Object.values(mapping).filter(Boolean).length} of {headers.length} columns auto-matched
+                <CardDescription className="mt-1">
+                  <span className="font-medium text-foreground">{fileName}</span>
+                  {" · "}{rows.length} rows · {Object.values(mapping).filter(Boolean).length} of {headers.length} columns auto-matched
                 </CardDescription>
               </div>
-              <Button variant="ghost" onClick={cancelImport}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={cancelImport} className="shrink-0">
+                Cancel
+              </Button>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-8">
+          <CardContent className="space-y-6">
+            {/* Duplicate import warning */}
+            {dupeImportWarning && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 text-sm">
+                <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                <p className="text-yellow-800 dark:text-yellow-200">
+                  This file was imported before. Check for duplicate entries in the preview.
+                </p>
+              </div>
+            )}
+
             {/* Mapping grid */}
             <div className="bg-muted/30 p-4 rounded-lg border border-border">
               <h4 className="font-medium mb-4 flex items-center gap-2 text-sm">
                 <ArrowRight className="w-4 h-4 text-primary" />
                 Match your file's columns to member fields
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {headers.map(header => (
-                  <div key={header} className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium truncate" title={header}>{header}</label>
-                    <Select
-                      value={mapping[header] || "skip"}
-                      onValueChange={val =>
-                        setMapping(prev => ({ ...prev, [header]: val === "skip" ? "" : val }))
-                      }
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Skip column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="skip" className="text-muted-foreground italic">
-                          Skip this column
-                        </SelectItem>
-                        {MEMBER_SCHEMA.filter(f => f.key?.trim()).map(f => (
-                          <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+              <div className="overflow-y-auto max-h-[50vh]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {headers.map(header => (
+                    <div key={header} className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium truncate" title={header}>{header}</label>
+                      <Select
+                        value={mapping[header] || "skip"}
+                        onValueChange={val =>
+                          setMapping(prev => ({ ...prev, [header]: val === "skip" ? "" : val }))
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Skip column" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="max-h-[260px] overflow-y-auto">
+                          <SelectItem value="skip" className="text-muted-foreground italic">
+                            Skip this column
+                          </SelectItem>
+                          {MEMBER_SCHEMA.filter(f => f.key?.trim()).map(f => (
+                            <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Preview */}
+            {/* Preview table */}
             <div>
               <h4 className="font-medium mb-3 text-sm">Preview (first 3 rows)</h4>
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border overflow-x-auto -mx-1">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -413,8 +417,7 @@ export default function Import() {
                           <div className="text-[10px] text-primary font-medium mt-0.5">
                             {mapping[h]
                               ? `→ ${MEMBER_SCHEMA.find(f => f.key === mapping[h])?.label ?? mapping[h]}`
-                              : <span className="text-muted-foreground italic">skipped</span>
-                            }
+                              : <span className="text-muted-foreground italic">skipped</span>}
                           </div>
                         </TableHead>
                       ))}
@@ -434,46 +437,218 @@ export default function Import() {
                 </Table>
               </div>
             </div>
+
+            {/* Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Duplicate handling</p>
+                <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+                  {(["skip", "update"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setDuplicateMode(mode)}
+                      className={[
+                        "flex-1 px-3 py-2 transition-colors capitalize",
+                        duplicateMode === mode
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "bg-card text-muted-foreground hover:bg-muted",
+                      ].join(" ")}
+                    >
+                      {mode === "skip" ? "Skip duplicates" : "Overwrite duplicates"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {duplicateMode === "skip" ? "Existing members are preserved" : "Existing member data will be overwritten"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Replace existing data</p>
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors">
+                  <Checkbox
+                    checked={replaceAll}
+                    onCheckedChange={(v) => setReplaceAll(Boolean(v))}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm font-medium leading-tight">Replace all existing members</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Discard current directory and replace with this file entirely.
+                    </p>
+                  </div>
+                </label>
+                {replaceAll && (
+                  <p className="text-xs text-destructive font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    All {members.length} existing member{members.length !== 1 ? "s" : ""} will be removed.
+                  </p>
+                )}
+              </div>
+            </div>
           </CardContent>
 
-          <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 border-t pt-6">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Duplicates:</span>
-              <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-                <button
-                  onClick={() => setDuplicateMode("skip")}
-                  className={[
-                    "px-3 py-1.5 transition-colors",
-                    duplicateMode === "skip"
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "bg-card text-muted-foreground hover:bg-muted",
-                  ].join(" ")}
-                >
-                  Skip
-                </button>
-                <button
-                  onClick={() => setDuplicateMode("update")}
-                  className={[
-                    "px-3 py-1.5 transition-colors",
-                    duplicateMode === "update"
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "bg-card text-muted-foreground hover:bg-muted",
-                  ].join(" ")}
-                >
-                  Overwrite
-                </button>
-              </div>
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {duplicateMode === "skip" ? "Existing members are preserved" : "Existing members will be overwritten"}
-              </span>
-            </div>
-            <Button onClick={executeImport} className="gap-2 shrink-0">
-              <CheckCircle2 className="w-4 h-4" />
-              Import {rows.length} Member{rows.length !== 1 ? "s" : ""}
+          <CardFooter className="flex flex-col sm:flex-row justify-between gap-3 border-t pt-5">
+            <Button variant="outline" onClick={cancelImport} className="gap-2 sm:w-auto w-full">
+              <ChevronLeft className="w-4 h-4" /> Back
+            </Button>
+            <Button
+              onClick={runAnalysis}
+              disabled={isAnalysing || !Object.values(mapping).includes("fullName")}
+              className="gap-2 sm:w-auto w-full"
+            >
+              {isAnalysing ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
+              ) : (
+                <><CheckCircle2 className="w-4 h-4" /> Analyse {rows.length} Row{rows.length !== 1 ? "s" : ""}</>
+              )}
             </Button>
           </CardFooter>
         </Card>
       )}
+
+      {/* ── Step 3: Validation preview ── */}
+      {step === "preview" && analysis && (
+        <div className="space-y-5 animate-in fade-in zoom-in-95">
+          {/* Stats grid */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="font-serif flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-primary" />
+                Import Preview — Dry Run
+              </CardTitle>
+              <CardDescription>
+                Review what will happen before committing. Nothing has been saved yet.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard icon={<Users className="w-4 h-4" />} label="Total rows" value={analysis.stats.totalRows} />
+                <StatCard icon={<CheckCircle2 className="w-4 h-4 text-green-600" />} label="Valid rows" value={analysis.stats.validRows} color="green" />
+                <StatCard icon={<Copy className="w-4 h-4 text-yellow-600" />} label="Dupes in file" value={analysis.stats.duplicatesInFile} color={analysis.stats.duplicatesInFile > 0 ? "yellow" : undefined} />
+                <StatCard icon={<Link2 className="w-4 h-4 text-blue-600" />} label="Relationships resolved" value={analysis.stats.relationshipsResolved} color="blue" />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                <StatCard icon={<CheckCircle2 className="w-4 h-4 text-green-600" />} label="Will be added" value={analysis.stats.newMembers} color="green" />
+                <StatCard icon={<RefreshCw className="w-4 h-4 text-blue-600" />} label="Will be updated" value={analysis.stats.updatedMembers} color="blue" />
+                <StatCard icon={<SkipForward className="w-4 h-4 text-muted-foreground" />} label="Will be skipped" value={analysis.stats.skippedMembers} />
+              </div>
+
+              {analysis.stats.relationshipsUnresolved > 0 && (
+                <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-sm">
+                  <LinkIcon className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                  <p className="text-orange-800 dark:text-orange-200">
+                    <strong>{analysis.stats.relationshipsUnresolved}</strong> relationship{analysis.stats.relationshipsUnresolved !== 1 ? "s" : ""} could not be resolved — parent/spouse names not found.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Warnings */}
+          {analysis.warnings.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="font-serif text-base flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                  Warnings & Notes
+                  <Badge variant="secondary" className="ml-auto">{analysis.warnings.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-y-auto max-h-[300px] divide-y divide-border">
+                  {analysis.warnings.map((w, i) => {
+                    const meta = warnMeta(w.type);
+                    return (
+                      <div key={i} className="flex items-start gap-3 px-5 py-3">
+                        <span className={`mt-0.5 shrink-0 ${meta.color}`}>{meta.icon}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${meta.color}`}>
+                              {meta.label}
+                            </span>
+                            <span className="text-sm font-medium truncate">{w.memberName}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{w.detail}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {analysis.warnings.length === 0 && (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">No issues found</p>
+                <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                  All relationships resolved cleanly. The import looks ready to go.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Options reminder */}
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline" className="gap-1.5">
+              Duplicates: {duplicateMode === "skip" ? "Skip" : "Overwrite"}
+            </Badge>
+            {replaceAll && (
+              <Badge variant="destructive" className="gap-1.5">
+                <AlertTriangle className="w-3 h-3" /> Replace all existing data
+              </Badge>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button variant="outline" onClick={() => setStep("mapping")} className="gap-2 sm:w-auto w-full" disabled={isImporting}>
+              <ChevronLeft className="w-4 h-4" /> Back to Mapping
+            </Button>
+            <Button
+              onClick={executeImport}
+              disabled={isImporting || analysis.stats.validRows === 0}
+              className="gap-2 sm:ml-auto sm:w-auto w-full"
+            >
+              {isImporting ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Importing…</>
+              ) : (
+                <><CheckCircle2 className="w-4 h-4" /> Execute Import ({analysis.stats.newMembers + analysis.stats.updatedMembers} changes)</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  color?: "green" | "blue" | "yellow" | "red";
+}
+
+function StatCard({ icon, label, value, color }: StatCardProps) {
+  const colorMap: Record<string, string> = {
+    green: "text-green-700 dark:text-green-400",
+    blue: "text-blue-700 dark:text-blue-400",
+    yellow: "text-yellow-700 dark:text-yellow-400",
+    red: "text-red-700 dark:text-red-400",
+  };
+  const colorClass = (color ? colorMap[color] : undefined) ?? "text-foreground";
+
+  return (
+    <div className="flex flex-col gap-1 p-3 rounded-lg border border-border bg-muted/20">
+      <div className="flex items-center gap-1.5 text-muted-foreground">{icon}<span className="text-xs">{label}</span></div>
+      <p className={`text-2xl font-bold tabular-nums ${colorClass}`}>{value}</p>
     </div>
   );
 }

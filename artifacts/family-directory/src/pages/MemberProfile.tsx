@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { WhatsAppWishButton } from "@/components/WhatsAppWishButton";
 
 export default function MemberProfile() {
   const { id } = useParams();
@@ -221,23 +222,25 @@ export default function MemberProfile() {
                     <>
                       {member.birthday && (() => {
                         try { const d = parseISO(member.birthday); return (
-                          <div className="flex gap-3">
+                          <div className="flex items-start gap-3">
                             <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="text-sm text-muted-foreground">Birthday</p>
                               <p className="font-medium">{format(d, "MMMM d, yyyy")}</p>
                             </div>
+                            <WhatsAppWishButton member={member} type="birthday" size="sm" />
                           </div>
                         ); } catch { return null; }
                       })()}
                       {member.anniversary && (() => {
                         try { const d = parseISO(member.anniversary); return (
-                          <div className="flex gap-3">
+                          <div className="flex items-start gap-3">
                             <Heart className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="text-sm text-muted-foreground">Anniversary</p>
                               <p className="font-medium">{format(d, "MMMM d, yyyy")}</p>
                             </div>
+                            <WhatsAppWishButton member={member} type="anniversary" size="sm" />
                           </div>
                         ); } catch { return null; }
                       })()}

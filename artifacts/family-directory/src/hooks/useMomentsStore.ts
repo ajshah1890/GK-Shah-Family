@@ -7,6 +7,7 @@ import {
   deleteMomentPhoto,
   makeMomentPhotoKey,
 } from "@/lib/momentsRepository";
+import { loadFromGitHub } from "./useGitHubSync";
 
 function generateId(): string {
   return `moment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -33,9 +34,36 @@ export function useMomentsStore() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const loaded = loadMoments();
-    setMoments(loaded);
-    setIsLoaded(true);
+    let cancelled = false;
+
+    async function init() {
+      const local = loadMoments();
+      if (local.length > 0 && !cancelled) {
+        setMoments(local);
+        setIsLoaded(true);
+      }
+
+      try {
+        const remote = await loadFromGitHub<Moment[]>("moments");
+        if (cancelled) return;
+        if (remote && Array.isArray(remote) && remote.length > 0) {
+          setMoments(remote);
+          saveMoments(remote);
+          setIsLoaded(true);
+          return;
+        }
+      } catch {
+        // network error — use local
+      }
+
+      if (!cancelled) {
+        if (local.length === 0) setMoments([]);
+        setIsLoaded(true);
+      }
+    }
+
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   const persist = useCallback((updated: Moment[]) => {

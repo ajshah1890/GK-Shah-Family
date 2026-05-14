@@ -14,15 +14,18 @@ import {
   Download, Upload, Info, FileSpreadsheet, Shield,
   Camera, Database, AlertTriangle, CheckCircle2,
   Clock, Archive, History, Trash2, ChevronDown, ChevronUp,
+  CloudUpload, RefreshCw, Wifi, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useCallback } from "react";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { Link } from "wouter";
 import { readAuditLog, clearAuditLog, AuditEntry, AuditAction } from "@/lib/auditLog";
 import { photoRepository } from "@/lib/repository";
 import { loadMoments } from "@/lib/momentsRepository";
 import { FamilyMember } from "@/types/family";
+import { syncToGitHub } from "@/hooks/useGitHubSync";
+import { useMomentsStore } from "@/hooks/useMomentsStore";
 
 interface RestorePreview {
   members: FamilyMember[];
@@ -31,8 +34,11 @@ interface RestorePreview {
   exportedAt?: string;
 }
 
+type SyncState = "idle" | "syncing" | "success" | "error";
+
 export default function Settings() {
   const { members, importMembers } = useFamilyStore();
+  const { moments } = useMomentsStore();
   const { theme } = useTheme();
   const { changePassword, isAdmin } = useAdminMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +51,51 @@ export default function Settings() {
   const [migrationResult, setMigrationResult] = useState<{ migrated: number; skipped: number } | null>(null);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[] | null>(null);
   const [auditExpanded, setAuditExpanded] = useState<Record<string, boolean>>({});
+
+  const [membersSyncState, setMembersSyncState] = useState<SyncState>("idle");
+  const [momentsSyncState, setMomentsSyncState] = useState<SyncState>("idle");
+  const [membersSavedAt, setMembersSavedAt] = useState<string | null>(null);
+  const [momentsSavedAt, setMomentsSavedAt] = useState<string | null>(null);
+  const [membersSyncError, setMembersSyncError] = useState<string | null>(null);
+  const [momentsSyncError, setMomentsSyncError] = useState<string | null>(null);
+
+  const handleSyncMembers = useCallback(async () => {
+    if (!isAdmin) return;
+    setMembersSyncState("syncing");
+    setMembersSyncError(null);
+    const payload = { version: 2, members };
+    const result = await syncToGitHub("members", payload);
+    if (result.ok) {
+      setMembersSyncState("success");
+      setMembersSavedAt(result.savedAt ?? new Date().toISOString());
+      toast.success(`Members synced to GitHub — ${members.length} records`);
+    } else {
+      setMembersSyncState("error");
+      setMembersSyncError(result.error ?? "Unknown error");
+      toast.error(`Sync failed: ${result.error}`);
+    }
+  }, [isAdmin, members]);
+
+  const handleSyncMoments = useCallback(async () => {
+    if (!isAdmin) return;
+    setMomentsSyncState("syncing");
+    setMomentsSyncError(null);
+    const result = await syncToGitHub("moments", moments);
+    if (result.ok) {
+      setMomentsSyncState("success");
+      setMomentsSavedAt(result.savedAt ?? new Date().toISOString());
+      toast.success(`Moments synced to GitHub — ${moments.length} records`);
+    } else {
+      setMomentsSyncState("error");
+      setMomentsSyncError(result.error ?? "Unknown error");
+      toast.error(`Sync failed: ${result.error}`);
+    }
+  }, [isAdmin, moments]);
+
+  const handleSyncAll = useCallback(async () => {
+    await handleSyncMembers();
+    await handleSyncMoments();
+  }, [handleSyncMembers, handleSyncMoments]);
 
   const inlinePhotoCount = useMemo(
     () => members.filter(m => m.photo?.startsWith("data:")).length,
@@ -202,6 +253,109 @@ export default function Settings() {
         <h1 className="text-3xl font-serif font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1">Manage app preferences and data.</p>
       </div>
+
+      {/* GitHub Sync (admin only) */}
+      {isAdmin && (
+        <Card className="border-amber-200 dark:border-amber-800/40">
+          <CardHeader>
+            <CardTitle className="font-serif flex items-center gap-2">
+              <CloudUpload className="w-5 h-5 text-amber-600" />
+              GitHub Sync
+            </CardTitle>
+            <CardDescription>
+              Push the latest data to the shared GitHub repository so everyone sees updates on their next visit.
+              Photos stay on-device (IndexedDB) and are not synced.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Members row */}
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center gap-2 min-w-0">
+                {membersSyncState === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                ) : membersSyncState === "error" ? (
+                  <WifiOff className="w-4 h-4 text-destructive shrink-0" />
+                ) : (
+                  <Wifi className="w-4 h-4 text-muted-foreground shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Members</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {membersSyncState === "success" && membersSavedAt
+                      ? `Last synced ${new Date(membersSavedAt).toLocaleTimeString()}`
+                      : membersSyncState === "error"
+                      ? membersSyncError ?? "Sync failed"
+                      : `${members.length} members in local store`}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSyncMembers}
+                disabled={membersSyncState === "syncing"}
+                className="shrink-0 gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${membersSyncState === "syncing" ? "animate-spin" : ""}`} />
+                {membersSyncState === "syncing" ? "Syncing…" : "Sync"}
+              </Button>
+            </div>
+
+            {/* Moments row */}
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center gap-2 min-w-0">
+                {momentsSyncState === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                ) : momentsSyncState === "error" ? (
+                  <WifiOff className="w-4 h-4 text-destructive shrink-0" />
+                ) : (
+                  <Wifi className="w-4 h-4 text-muted-foreground shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Moments</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {momentsSyncState === "success" && momentsSavedAt
+                      ? `Last synced ${new Date(momentsSavedAt).toLocaleTimeString()}`
+                      : momentsSyncState === "error"
+                      ? momentsSyncError ?? "Sync failed"
+                      : `${moments.length} moments in local store`}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSyncMoments}
+                disabled={momentsSyncState === "syncing"}
+                className="shrink-0 gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${momentsSyncState === "syncing" ? "animate-spin" : ""}`} />
+                {momentsSyncState === "syncing" ? "Syncing…" : "Sync"}
+              </Button>
+            </div>
+
+            {/* Sync All */}
+            <Button
+              onClick={handleSyncAll}
+              disabled={membersSyncState === "syncing" || momentsSyncState === "syncing"}
+              className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <CloudUpload className="w-4 h-4" />
+              {membersSyncState === "syncing" || momentsSyncState === "syncing"
+                ? "Syncing…"
+                : "Sync All Changes to GitHub"}
+            </Button>
+
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2.5">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Each sync creates a backup snapshot in the repository before overwriting. Family members will
+                see your changes on their next app load. Photos are stored locally only.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Appearance */}
       <Card>
@@ -391,9 +545,9 @@ export default function Settings() {
           <div className="bg-muted/50 p-4 rounded-lg flex gap-3 text-sm text-muted-foreground items-start">
             <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <p>
-              <strong>Privacy Note:</strong> This app runs entirely in your browser. No data is ever sent to a server.
-              Everything is stored locally on this device. Clearing your browser data will delete the directory.
-              Export a backup regularly to avoid data loss.
+              <strong>How data works:</strong> Changes are saved locally on this device first.
+              Admins can push updates to the shared repository via Settings &gt; GitHub Sync — family members on other
+              devices will see the latest data on their next visit. Photos stay on-device and are never synced.
             </p>
           </div>
         </CardContent>

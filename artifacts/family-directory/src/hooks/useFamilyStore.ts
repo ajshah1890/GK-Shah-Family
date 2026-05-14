@@ -6,6 +6,7 @@ import {
   wouldCreateCircularAncestry,
 } from '../lib/familyTree';
 import { logAudit, diffMembers } from '../lib/auditLog';
+import { loadFromGitHub } from './useGitHubSync';
 
 const STORAGE_KEY = 'gkshah_family_members';
 const SCHEMA_VERSION = 2;
@@ -167,15 +168,49 @@ export function useFamilyStore() {
   const [hasUndo, setHasUndo] = useState(false);
 
   useEffect(() => {
-    const loaded = load();
-    if (loaded.length === 0) {
-      const initial = migrateMembers(SAMPLE_MEMBERS as any[]);
-      setMembers(initial);
-      save(initial);
-    } else {
-      setMembers(loaded);
+    let cancelled = false;
+
+    async function init() {
+      // 1. Show localStorage data immediately so UI is not blank
+      const local = load();
+      if (local.length > 0 && !cancelled) {
+        setMembers(local);
+        setIsLoaded(true);
+      }
+
+      // 2. Try fetching from GitHub (via API proxy)
+      try {
+        const remote = await loadFromGitHub<{ version?: number; members?: any[] } | any[]>("members");
+        if (cancelled) return;
+        if (remote) {
+          const raw = Array.isArray(remote)
+            ? remote
+            : (remote as { members?: any[] }).members ?? [];
+          if (raw.length > 0) {
+            const migrated = migrateMembers(raw);
+            setMembers(migrated);
+            save(migrated);
+            setIsLoaded(true);
+            return;
+          }
+        }
+      } catch {
+        // network error — fall through to local
+      }
+
+      // 3. Fall back: seed sample data if still empty
+      if (!cancelled) {
+        if (local.length === 0) {
+          const initial = migrateMembers(SAMPLE_MEMBERS as any[]);
+          setMembers(initial);
+          save(initial);
+        }
+        setIsLoaded(true);
+      }
     }
-    setIsLoaded(true);
+
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   const saveMembers = (next: FamilyMember[]) => {

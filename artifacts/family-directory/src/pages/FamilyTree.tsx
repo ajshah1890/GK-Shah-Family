@@ -392,12 +392,28 @@ export default function FamilyTree() {
     const cw2 = canvasRef.current?.clientWidth  ?? cvsSize.w;
     const ch2 = canvasRef.current?.clientHeight ?? cvsSize.h;
     if (!cw2 || !ch2) return;
-    const pad = 48;
-    const rawZoom = Math.min((cw2 - pad * 2) / layout.bounds.w, (ch2 - pad * 2) / layout.bounds.h);
-    const z = Math.max(0.12, Math.min(rawZoom, 1.4));
+    const pad = 40;
+    const availW = cw2 - pad * 2;
+    const availH = ch2 - pad * 2;
+    const { w: treeW, h: treeH, x: treeX, y: treeY } = layout.bounds;
+
+    // Height-first fitting: prioritise keeping all generations visible vertically.
+    // Very wide trees (134+ members) are expected to overflow horizontally — panning handles that.
+    const heightFit = availH / treeH;
+    const widthFit  = availW / treeW;
+
+    // Only use min(width,height) when tree is narrow enough to fit comfortably;
+    // otherwise let it overflow horizontally at the height-fit zoom.
+    const rawZoom = treeW * heightFit <= availW * 1.6
+      ? Math.min(heightFit, widthFit)
+      : heightFit;
+
+    // Clamp: never below 0.45 (cards become unreadable), never above 1.5 (wastes space)
+    const z = Math.max(0.45, Math.min(rawZoom, 1.5));
+
     setPan({
-      x: (cw2 - layout.bounds.w * z) / 2 - layout.bounds.x * z,
-      y: pad - layout.bounds.y * z,
+      x: (cw2 - treeW * z) / 2 - treeX * z,   // centre horizontally
+      y: pad - treeY * z,                        // align top with padding
     });
     setZoom(z);
   }, [layout, cvsSize]);
@@ -728,6 +744,11 @@ export default function FamilyTree() {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onDoubleClick={(e) => {
+          // Double-click on the background (not on a card) → reset to best-fit view
+          const target = e.target as HTMLElement;
+          if (!target.closest("button,a,input,[data-card]")) fitTree();
+        }}
         style={{ touchAction: "none" }}
       >
         <div

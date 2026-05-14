@@ -34,6 +34,11 @@ export interface SyncDiagnostic {
   latencyMs: number;
   error?: string;
   responsePreview?: string;
+  // enriched diagnostics
+  endpoint?: string;
+  method?: string;
+  contentType?: string | null;
+  responseBodyPreview?: string;
 }
 
 const API_BASE = "/api/data";
@@ -48,34 +53,44 @@ function getAdminPassword(): string {
 
 /**
  * Safely reads a Response body and parses JSON.
- * Never throws — returns { json: null, error: ... } on failure.
+ * Never throws — returns { json: null, error: ..., rawText, contentType } on failure.
  */
-async function safeJson(res: Response): Promise<{ json: Record<string, unknown> | null; error: string | null }> {
+async function safeJson(res: Response): Promise<{
+  json: Record<string, unknown> | null;
+  error: string | null;
+  rawText: string;
+  contentType: string | null;
+}> {
+  const contentType = res.headers.get("content-type");
   let text = "";
   try {
     text = await res.text();
   } catch (err) {
-    return { json: null, error: `Could not read response body: ${err instanceof Error ? err.message : String(err)}` };
+    return { json: null, error: `Could not read response body: ${err instanceof Error ? err.message : String(err)}`, rawText: "", contentType };
   }
 
   if (!text.trim()) {
-    return { json: {}, error: null };
+    return { json: {}, error: null, rawText: text, contentType };
   }
 
-  const contentType = res.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json") && !contentType.includes("text/json")) {
+  const ct = contentType ?? "";
+  if (!ct.includes("application/json") && !ct.includes("text/json")) {
     return {
       json: null,
-      error: `Expected JSON but received ${contentType || "unknown content-type"}: ${text.slice(0, 120)}`,
+      error: `Expected JSON but received ${ct || "unknown content-type"}: ${text.slice(0, 120)}`,
+      rawText: text,
+      contentType,
     };
   }
 
   try {
-    return { json: JSON.parse(text) as Record<string, unknown>, error: null };
+    return { json: JSON.parse(text) as Record<string, unknown>, error: null, rawText: text, contentType };
   } catch (err) {
     return {
       json: null,
       error: `JSON parse failed: ${err instanceof Error ? err.message : String(err)} — body preview: ${text.slice(0, 120)}`,
+      rawText: text,
+      contentType,
     };
   }
 }
@@ -96,13 +111,15 @@ function recordDiagnostic(d: SyncDiagnostic) {
 }
 
 export async function loadFromGitHub<T>(type: SyncDataType): Promise<T | null> {
+  const endpoint = `${API_BASE}/${type}`;
+  const method = "GET";
   const t0 = Date.now();
   try {
-    const res = await fetch(`${API_BASE}/${type}`, {
+    const res = await fetch(endpoint, {
       headers: { "Cache-Control": "no-cache" },
     });
     const latencyMs = Date.now() - t0;
-    const { json, error } = await safeJson(res);
+    const { json, error, rawText, contentType } = await safeJson(res);
 
     if (error || !res.ok || !json) {
       recordDiagnostic({
@@ -114,6 +131,10 @@ export async function loadFromGitHub<T>(type: SyncDataType): Promise<T | null> {
         latencyMs,
         error: error ?? `HTTP ${res.status}`,
         responsePreview: error ?? undefined,
+        endpoint,
+        method,
+        contentType,
+        responseBodyPreview: rawText.slice(0, 200),
       });
       return null;
     }
@@ -125,6 +146,9 @@ export async function loadFromGitHub<T>(type: SyncDataType): Promise<T | null> {
       httpStatus: res.status,
       ok: true,
       latencyMs,
+      endpoint,
+      method,
+      contentType,
     });
 
     return (json["data"] as T) ?? null;
@@ -139,6 +163,9 @@ export async function loadFromGitHub<T>(type: SyncDataType): Promise<T | null> {
       ok: false,
       latencyMs,
       error: msg,
+      endpoint,
+      method,
+      contentType: null,
     });
     return null;
   }
@@ -148,11 +175,13 @@ export async function syncToGitHub<T>(
   type: SyncDataType,
   data: T
 ): Promise<{ ok: boolean; savedAt?: string; error?: string }> {
+  const endpoint = `${API_BASE}/${type}`;
+  const method = "POST";
   const t0 = Date.now();
   try {
     const adminPassword = getAdminPassword();
-    const res = await fetch(`${API_BASE}/${type}`, {
-      method: "POST",
+    const res = await fetch(endpoint, {
+      method,
       headers: {
         "Content-Type": "application/json",
         "X-Admin-Secret": adminPassword,
@@ -160,7 +189,7 @@ export async function syncToGitHub<T>(
       body: JSON.stringify(data),
     });
     const latencyMs = Date.now() - t0;
-    const { json, error } = await safeJson(res);
+    const { json, error, rawText, contentType } = await safeJson(res);
 
     if (error) {
       recordDiagnostic({
@@ -172,6 +201,10 @@ export async function syncToGitHub<T>(
         latencyMs,
         error,
         responsePreview: error,
+        endpoint,
+        method,
+        contentType,
+        responseBodyPreview: rawText.slice(0, 200),
       });
       return { ok: false, error };
     }
@@ -186,6 +219,10 @@ export async function syncToGitHub<T>(
         ok: false,
         latencyMs,
         error: msg,
+        endpoint,
+        method,
+        contentType,
+        responseBodyPreview: rawText.slice(0, 200),
       });
       return { ok: false, error: msg };
     }
@@ -198,6 +235,9 @@ export async function syncToGitHub<T>(
       httpStatus: res.status,
       ok: true,
       latencyMs,
+      endpoint,
+      method,
+      contentType,
     });
     return { ok: true, savedAt };
   } catch (err) {
@@ -211,6 +251,9 @@ export async function syncToGitHub<T>(
       ok: false,
       latencyMs,
       error: msg,
+      endpoint,
+      method,
+      contentType: null,
     });
     return { ok: false, error: msg };
   }

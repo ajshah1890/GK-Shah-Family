@@ -1,0 +1,128 @@
+Focus ONLY on:
+
+1. GitHub sync API routing on Vercel
+2. Family Tree default fit/zoom tuning
+
+Do NOT modify import logic or tree layout algorithm.
+
+====================================
+ISSUE 1 — GITHUB SYNC RETURNS HTML
+==================================
+
+Current diagnostics show:
+
+Expected JSON but received:
+text/html
+
+HTTP 405
+
+Meaning:
+The frontend is hitting a non-JSON route on Vercel.
+Likely the app shell HTML page instead of an API endpoint.
+
+Tasks:
+
+1. Audit ALL GitHub sync endpoints.
+
+2. Verify correct Vercel API structure:
+
+* /api/*
+* serverless function placement
+* routing
+* rewrites
+
+3. Ensure every API endpoint:
+
+* exists
+* deploys on Vercel
+* returns application/json
+* supports correct HTTP methods
+
+4. Add explicit method guards:
+
+* GET
+* POST
+* PUT
+  Return proper JSON 405 responses.
+
+5. Add health endpoint:
+   `/api/health`
+
+Should return:
+{
+ok: true,
+timestamp,
+environment
+}
+
+6. Add visible API diagnostics:
+
+* endpoint URL
+* response content-type
+* response body preview
+* HTTP method used
+
+7. Verify GitHub token env variable loading on Vercel.
+
+8. Ensure frontend NEVER accidentally calls frontend routes instead of API routes.
+
+====================================
+ISSUE 2 — TREE DEFAULT ZOOM TOO SMALL
+=====================================
+
+The new tree engine works correctly,
+but fitTree() is over-zooming out aggressively.
+
+Result:
+all cards appear microscopic with massive unused space.
+
+Tasks:
+
+1. Tune fitTree() heuristics.
+
+2. Add:
+
+* minimum default zoom clamp
+* better padding calculation
+* smarter aspect-ratio fitting
+
+3. Ensure initial tree load:
+
+* fills viewport comfortably
+* cards remain readable
+* no excessive empty space
+
+4. Improve auto-fit behavior:
+
+* fit width OR height intelligently
+* avoid shrinking below readable size
+
+5. Add:
+   “Reset View” =
+   return to ideal readable zoom level
+
+6. Add:
+   double-click background =
+   smart auto-fit recenter
+
+7. Improve compact mode:
+   Current layout is good structurally,
+   but still visually too zoomed out.
+
+====================================
+IMPORTANT
+=========
+
+Do NOT rewrite the new tree engine.
+The coordinate layout system is working correctly.
+
+Only tune:
+
+* viewport math
+* fit calculations
+* API routing/deployment
+
+Goal:
+
+* GitHub sync fully operational
+* Tree opens at a readable scale automatically

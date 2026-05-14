@@ -135,4 +135,10 @@ router.post("/:type", async (req: Request, res: Response) => {
   }
 });
 
+// Explicit 405 for any unsupported method on /:type
+router.all("/:type", (_req, res) => {
+  res.setHeader("Allow", "GET, POST");
+  res.status(405).json({ error: "Method not allowed. Supported: GET, POST." });
+});
+
 export default router;

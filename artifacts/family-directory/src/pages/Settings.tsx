@@ -459,16 +459,26 @@ export default function Settings() {
                   <div className="max-h-48 overflow-y-auto space-y-1">
                     {syncDiagnostics.map((d, i) => (
                       <div key={i} className={`rounded px-2 py-1.5 text-[10px] font-mono border ${d.ok ? "bg-green-50/50 border-green-200 dark:bg-green-950/10 dark:border-green-800/30" : "bg-red-50/50 border-red-200 dark:bg-red-950/10 dark:border-red-800/30"}`}>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={d.ok ? "text-green-600" : "text-red-500"}>{d.ok ? "✓" : "✗"}</span>
-                          <span className="font-semibold">{d.direction === "write" ? "POST" : "GET"} /api/data/{d.type}</span>
+                          <span className="font-semibold">{d.method ?? (d.direction === "write" ? "POST" : "GET")} {d.endpoint ?? `/api/data/${d.type}`}</span>
                           <span className="text-muted-foreground">HTTP {d.httpStatus ?? "—"}</span>
                           <span className="text-muted-foreground ml-auto">{d.latencyMs} ms</span>
                         </div>
-                        <div className="text-muted-foreground">
-                          {new Date(d.timestamp).toLocaleTimeString()}
-                          {d.error && <span className="text-red-500 ml-2">{d.error}</span>}
+                        <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          <span>{new Date(d.timestamp).toLocaleTimeString()}</span>
+                          {d.contentType != null && (
+                            <span className={d.contentType?.includes("application/json") ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
+                              {d.contentType || "no content-type"}
+                            </span>
+                          )}
+                          {d.error && <span className="text-red-500 break-all">{d.error}</span>}
                         </div>
+                        {d.responseBodyPreview && !d.ok && (
+                          <div className="mt-1 text-[9px] text-muted-foreground/70 truncate border-t border-current/10 pt-0.5">
+                            {d.responseBodyPreview}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

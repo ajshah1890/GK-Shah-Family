@@ -204,6 +204,10 @@ function save(members: FamilyMember[]) {
     const data: StoredData = { version: SCHEMA_VERSION, members };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     localStorage.setItem('gkshah_local_save_at', String(_localSaveTimestamp));
+    // Broadcast to every mounted useFamilyStore instance.
+    // useFamilyStore uses per-component useState, so a save in one component
+    // is invisible to every other mounted component without this notification.
+    window.dispatchEvent(new CustomEvent('gkshah:members-changed', { detail: { count: members.length } }));
   } catch {
     // localStorage quota exceeded — data remains in memory
   }
@@ -294,12 +298,18 @@ export function useFamilyStore() {
 
             // Guard 1 — block if a save is in progress: an in-flight GitHub response
             // must not overwrite a local write that just happened.
+            // Use a fresh load() so state reflects any save that happened AFTER
+            // init() started capturing `local`.
             if (_isSaving) {
+              const localNow = load();
               logHydration(
-                `Members: GitHub response arrived during active save — skipping overwrite ` +
-                `(${migrated.length} remote ignored, ${local.length} local preserved)`
+                `Members: GitHub response arrived during active save — refreshing to post-save state ` +
+                `(${migrated.length} remote ignored, ${localNow.length} local preserved)`
               );
-              if (!cancelled) setIsLoaded(true);
+              if (!cancelled) {
+                setMembers(localNow);
+                setIsLoaded(true);
+              }
               return;
             }
 
@@ -369,26 +379,38 @@ export function useFamilyStore() {
             return;
           }
 
-          // Guard B — save in progress: don't touch state
+          // Guard B — save in progress: re-read localStorage so any write that
+          // happened AFTER init() started (and after `local` was captured) is visible.
           if (_isSaving) {
+            const localNow = load();
             logHydration(
-              `Members: GitHub returned 0 but save is in progress — preserving local state (${local.length} member${local.length !== 1 ? "s" : ""})`
+              `Members: GitHub returned 0 but save is in progress — refreshing to post-save state (${localNow.length} member${localNow.length !== 1 ? "s" : ""})`
             );
-            if (!cancelled) setIsLoaded(true);
+            if (!cancelled) {
+              setMembers(localNow);
+              setIsLoaded(true);
+            }
             return;
           }
 
-          // Guard C — local data exists: keep it, never overwrite with empty
-          if (local.length > 0) {
+          // Guard C — re-read localStorage RIGHT NOW instead of using the `local`
+          // snapshot captured at init() start. A save (addMember / importMembers)
+          // may have written data AFTER init() started but BEFORE this GitHub
+          // response arrived, making the captured `local` stale and Guard C fail.
+          const localNow = load();
+          if (localNow.length > 0) {
             logHydration(
-              `Members: GitHub returned 0 — preserving ${local.length} local-only member${local.length !== 1 ? "s" : ""} ` +
+              `Members: GitHub returned 0 — preserving ${localNow.length} local-only member${localNow.length !== 1 ? "s" : ""} ` +
               `(remote is empty, local is authoritative)`
             );
             console.log(
               "[GKShah] HYDRATION 0-member guard fired:",
-              local.map(m => ({ id: m.id, name: m.fullName, updatedAt: m.updatedAt }))
+              localNow.map(m => ({ id: m.id, name: m.fullName, updatedAt: m.updatedAt }))
             );
-            if (!cancelled) setIsLoaded(true);
+            if (!cancelled) {
+              setMembers(localNow);
+              setIsLoaded(true);
+            }
             return;
           }
 
@@ -421,6 +443,25 @@ export function useFamilyStore() {
     init();
     return () => { cancelled = true; };
   }, []);
+
+  // Re-sync this instance whenever ANY component calls save().
+  // Without this, state changes made in one component (e.g. MemberForm adding a
+  // member) are never propagated to other mounted components (Dashboard, Members,
+  // FamilyTree, CommandPalette) because each has its own independent useState.
+  useEffect(() => {
+    const handleChange = (e: Event) => {
+      const count = (e as CustomEvent<{ count: number }>).detail?.count ?? '?';
+      console.log(
+        `%c[GKShah] useFamilyStore: members-changed broadcast — refreshing ${count} members into this instance`,
+        'color:#8b5e3c;font-style:italic'
+      );
+      const fresh = load();
+      setMembers(fresh);
+      setIsLoaded(true);
+    };
+    window.addEventListener('gkshah:members-changed', handleChange);
+    return () => window.removeEventListener('gkshah:members-changed', handleChange);
+  }, []); // setMembers / setIsLoaded are stable React dispatch functions
 
   const saveMembers = (next: FamilyMember[]) => {
     setMembers(next);

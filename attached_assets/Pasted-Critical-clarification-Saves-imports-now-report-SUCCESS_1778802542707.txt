@@ -1,0 +1,128 @@
+Critical clarification:
+
+Saves/imports now report SUCCESS consistently.
+No data disappears anymore.
+But UI does NOT reflect updates afterward.
+
+Examples:
+
+* add member says success but member not visible
+* import says success but list/tree unchanged
+* edit says saved but old values still shown
+
+This means:
+Persistence likely works,
+but React/Zustand state is not re-rendering correctly.
+
+Focus ONLY on state propagation and reactivity.
+
+====================================
+TASK 1 — VERIFY LOCALSTORAGE
+============================
+
+After:
+
+* add member
+* import
+* edit member
+
+Immediately log:
+JSON.parse(localStorage.getItem("gkshah_members"))
+
+Verify the new data actually exists there.
+
+If yes:
+Persistence layer is solved.
+
+====================================
+TASK 2 — VERIFY ZUSTAND REFERENCES
+==================================
+
+Audit ALL set() calls.
+
+Ensure:
+set({ members: [...next] })
+
+NOT:
+set({ members: next })
+
+if next may reuse old reference.
+
+Never mutate arrays/objects in place.
+
+====================================
+TASK 3 — VERIFY IMPORT FLOW
+===========================
+
+After import:
+log:
+
+* imported member count
+* final store count
+* final localStorage count
+
+====================================
+TASK 4 — FORCE RERENDER TEST
+============================
+
+Temporary test:
+After successful save/import:
+setMembers([...updatedMembers])
+
+with guaranteed new reference.
+
+Goal:
+see whether UI instantly updates.
+
+====================================
+TASK 5 — CHECK SELECTORS
+========================
+
+Audit:
+useFamilyStore selectors.
+
+Possible issue:
+components subscribe to stale memoized slices.
+
+====================================
+TASK 6 — CHECK DERIVED MEMOS
+============================
+
+Audit:
+
+* FamilyTree memo
+* filteredMembers memo
+* groupedMembers memo
+* lineage memo
+* relationship caches
+
+Ensure dependencies include:
+members
+
+and caches invalidate after updates.
+
+====================================
+TASK 7 — DEBUG PANEL
+====================
+
+Add temporary admin debug card:
+
+* store member count
+* rendered member count
+* localStorage member count
+
+Goal:
+identify exactly where divergence happens.
+
+====================================
+IMPORTANT
+=========
+
+Do NOT modify:
+
+* sync logic
+* API routes
+* import parser
+
+Goal:
+Fix the missing UI/state refresh after successful persistence.

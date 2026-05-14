@@ -102,13 +102,18 @@ export function useMomentsStore() {
 
         if (remote !== null) {
           if (Array.isArray(remote) && remote.length > 0) {
-            // Guard 1 — block if createMoment / updateMoment is in progress
+            // Guard 1 — block if createMoment / updateMoment is in progress.
+            // Use fresh loadMoments() to capture any write that happened after init() started.
             if (_isMomentSaving) {
+              const localNow = loadMoments();
               logHydration(
-                `Moments: GitHub response arrived during active save — skipping overwrite ` +
-                `(${remote.length} remote ignored, ${local.length} local preserved)`
+                `Moments: GitHub response arrived during active save — refreshing to post-save state ` +
+                `(${remote.length} remote ignored, ${localNow.length} local preserved)`
               );
-              if (!cancelled) setIsLoaded(true);
+              if (!cancelled) {
+                setMoments(localNow);
+                setIsLoaded(true);
+              }
               return;
             }
 
@@ -156,22 +161,31 @@ export function useMomentsStore() {
             return;
           }
 
-          // Guard B — save in progress: don't touch state
+          // Guard B — save in progress: use fresh read (same timing fix as members).
           if (_isMomentSaving) {
+            const localNow = loadMoments();
             logHydration(
-              `Moments: GitHub returned 0 but save is in progress — preserving local state (${local.length} moment${local.length !== 1 ? "s" : ""})`
+              `Moments: GitHub returned 0 but save is in progress — refreshing to post-save state (${localNow.length} moment${localNow.length !== 1 ? "s" : ""})`
             );
-            if (!cancelled) setIsLoaded(true);
+            if (!cancelled) {
+              setMoments(localNow);
+              setIsLoaded(true);
+            }
             return;
           }
 
-          // Guard C — local data exists: keep it, never overwrite with empty
-          if (local.length > 0) {
+          // Guard C — re-read localStorage NOW (captured `local` may be stale
+          // if a moment was created after init() started but before GitHub resolved).
+          const localNow = loadMoments();
+          if (localNow.length > 0) {
             logHydration(
-              `Moments: GitHub returned 0 — preserving ${local.length} local-only moment${local.length !== 1 ? "s" : ""} ` +
+              `Moments: GitHub returned 0 — preserving ${localNow.length} local-only moment${localNow.length !== 1 ? "s" : ""} ` +
               `(remote is empty, local is authoritative)`
             );
-            if (!cancelled) setIsLoaded(true);
+            if (!cancelled) {
+              setMoments(localNow);
+              setIsLoaded(true);
+            }
             return;
           }
 
@@ -202,9 +216,27 @@ export function useMomentsStore() {
     return () => { cancelled = true; };
   }, []);
 
+  // Re-sync whenever any component writes moments.
+  useEffect(() => {
+    const handleChange = (e: Event) => {
+      const count = (e as CustomEvent<{ count: number }>).detail?.count ?? '?';
+      console.log(
+        `%c[GKShah] useMomentsStore: moments-changed broadcast — refreshing ${count} moments into this instance`,
+        'color:#8b5e3c;font-style:italic'
+      );
+      const fresh = loadMoments();
+      setMoments(fresh);
+      setIsLoaded(true);
+    };
+    window.addEventListener('gkshah:moments-changed', handleChange);
+    return () => window.removeEventListener('gkshah:moments-changed', handleChange);
+  }, []);
+
   const persist = useCallback((updated: Moment[]) => {
     setMoments(updated);
     saveMoments(updated);
+    // Broadcast to every mounted useMomentsStore instance (same pattern as members).
+    window.dispatchEvent(new CustomEvent('gkshah:moments-changed', { detail: { count: updated.length } }));
   }, []);
 
   const createMoment = useCallback(

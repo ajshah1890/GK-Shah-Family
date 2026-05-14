@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Upload, X, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Upload, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { RelationshipCombobox } from "@/components/RelationshipCombobox";
 import { toast } from "sonner";
@@ -91,6 +91,7 @@ export default function MemberForm() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [duplicatesFound, setDuplicatesFound] = useState<{ member: FamilyMember; reasons: string[] }[]>([]);
   const [pendingData, setPendingData] = useState<Omit<FamilyMember, 'id'> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const isHydrating = useRef(false);
   const hydrated = useRef(false);
@@ -459,16 +460,20 @@ export default function MemberForm() {
       motherId:         memberData.motherId,
       spouseId:         memberData.spouseId,
     });
+    setSaveStatus('saving');
     if (isEditing && id) {
       const result = updateMember(id, memberData);
-      if (result.error) { toast.error(result.error); return; }
+      if (result.error) { toast.error(result.error); setSaveStatus('idle'); return; }
+      setSaveStatus('saved');
       toast.success("Member updated successfully");
-      setLocation(`/members/${id}`);
+      // Small delay so the "Saved locally ✓" indicator is briefly visible before navigation.
+      setTimeout(() => setLocation(`/members/${id}`), 700);
     } else {
       const result = addMember(memberData);
-      if (result.error) { toast.error(result.error); return; }
+      if (result.error) { toast.error(result.error); setSaveStatus('idle'); return; }
+      setSaveStatus('saved');
       toast.success("Member added successfully");
-      setLocation(`/members/${result.member.id}`);
+      setTimeout(() => setLocation(`/members/${result.member.id}`), 700);
     }
   };
 
@@ -1237,12 +1242,18 @@ export default function MemberForm() {
             </details>
           )}
 
-          <div className="flex justify-end gap-4">
+          <div className="flex justify-end items-center gap-4">
+            {saveStatus === 'saved' && (
+              <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="w-4 h-4" />
+                Saved locally
+              </span>
+            )}
             <Button type="button" variant="outline" onClick={() => setLocation(isEditing ? `/members/${id}` : "/members")}>
               Cancel
             </Button>
-            <Button type="submit" className="min-w-[150px]">
-              {isEditing ? "Save Changes" : "Add Member"}
+            <Button type="submit" className="min-w-[150px]" disabled={saveStatus === 'saving'}>
+              {saveStatus === 'saving' ? "Saving…" : isEditing ? "Save Changes" : "Add Member"}
             </Button>
           </div>
         </form>

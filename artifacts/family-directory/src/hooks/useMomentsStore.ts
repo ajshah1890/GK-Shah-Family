@@ -10,6 +10,45 @@ import {
 import { loadFromGitHub } from "./useGitHubSync";
 import { checkAndClearPostResetFlag, logHydration } from "@/lib/hardReset";
 
+// ─── Persistence guards ───────────────────────────────────────────────────────
+
+/** Same key as useFamilyStore — both stores honour the same debug toggle. */
+const GITHUB_HYDRATION_DISABLED_KEY = 'gkshah_disable_github_hydration';
+
+let _isMomentSaving = false;
+let _isMomentSavingTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setSavingMoment(): void {
+  _isMomentSaving = true;
+  if (_isMomentSavingTimer) clearTimeout(_isMomentSavingTimer);
+  _isMomentSavingTimer = setTimeout(() => { _isMomentSaving = false; }, 8000);
+}
+
+// ─── Smart merge ──────────────────────────────────────────────────────────────
+
+function smartMergeMoments(local: Moment[], remote: Moment[]): {
+  merged: Moment[];
+  localWins: number; remoteWins: number; localOnly: number; remoteOnly: number;
+} {
+  const localById  = new Map(local.map(m => [m.id, m]));
+  const remoteById = new Map(remote.map(m => [m.id, m]));
+  const allIds     = new Set([...localById.keys(), ...remoteById.keys()]);
+  const merged: Moment[] = [];
+  let localWins = 0, remoteWins = 0, localOnly = 0, remoteOnly = 0;
+
+  for (const id of allIds) {
+    const loc = localById.get(id);
+    const rem = remoteById.get(id);
+    if (!rem) { merged.push(loc!); localOnly++;  continue; }
+    if (!loc) { merged.push(rem);  remoteOnly++; continue; }
+    const localMs  = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
+    const remoteMs = rem.updatedAt ? new Date(rem.updatedAt).getTime() : 0;
+    if (localMs >= remoteMs) { merged.push(loc); localWins++;  }
+    else                     { merged.push(rem); remoteWins++; }
+  }
+  return { merged, localWins, remoteWins, localOnly, remoteOnly };
+}
+
 function generateId(): string {
   return `moment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -59,16 +98,62 @@ export function useMomentsStore() {
 
         if (remote !== null) {
           if (Array.isArray(remote) && remote.length > 0) {
-            logHydration(`Moments loaded from: GitHub (${remote.length} moment${remote.length !== 1 ? "s" : ""})`);
-            setMoments(remote);
-            saveMoments(remote);
-            setIsLoaded(true);
+            // Guard 1 — block if createMoment / updateMoment is in progress
+            if (_isMomentSaving) {
+              logHydration(
+                `Moments: GitHub response arrived during active save — skipping overwrite ` +
+                `(${remote.length} remote ignored, ${local.length} local preserved)`
+              );
+              if (!cancelled) setIsLoaded(true);
+              return;
+            }
+
+            // Guard 2 — debug toggle set in Settings › Persistence Controls
+            if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
+              logHydration(
+                `Moments: GitHub hydration disabled by debug toggle — keeping ${local.length} local moments`
+              );
+              if (!cancelled) setIsLoaded(true);
+              return;
+            }
+
+            // Smart merge: per-moment updatedAt comparison replaces blind overwrite
+            const { merged, localWins, remoteWins, localOnly, remoteOnly } =
+              smartMergeMoments(local, remote as Moment[]);
+
+            console.group("[GKShah Save Trace] HYDRATION PAYLOAD (moments)");
+            console.log(`Remote=${remote.length}  Local=${local.length}  Merged=${merged.length}`);
+            console.log(`localWins=${localWins}  remoteWins=${remoteWins}  localOnly=${localOnly}  remoteOnly=${remoteOnly}`);
+            console.groupEnd();
+
+            logHydration(
+              `Moments merged: ${merged.length} total | ` +
+              `localWins=${localWins} remoteWins=${remoteWins} ` +
+              `localOnly=${localOnly} remoteOnly=${remoteOnly}`
+            );
+
+            if (!cancelled) {
+              setMoments(merged);
+              saveMoments(merged);
+              setIsLoaded(true);
+            }
             return;
           }
-          // GitHub returned 0 moments — show empty, do NOT fall back to local
+
+          // GitHub returned 0 moments.
+          if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
+            logHydration(
+              `Moments: GitHub hydration disabled — keeping ${local.length} local moments (remote returned 0)`
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+          // Legitimately empty — show empty, do NOT fall back to local
           logHydration("Moments loaded from: GitHub (returned 0 moments — empty)");
-          setMoments([]);
-          setIsLoaded(true);
+          if (!cancelled) {
+            setMoments([]);
+            setIsLoaded(true);
+          }
           return;
         }
 
@@ -122,7 +207,15 @@ export function useMomentsStore() {
         updatedAt: now,
       };
 
+      // Mark saving BEFORE the write so any concurrent GitHub fetch response
+      // that resolves in the same tick will be blocked by the _isMomentSaving guard.
+      setSavingMoment();
       persist([moment, ...moments]);
+
+      console.group("[GKShah Save Trace] createMoment");
+      console.log("CREATED", { id: moment.id, caption: moment.caption, updatedAt: moment.updatedAt });
+      console.groupEnd();
+
       return moment;
     },
     [moments, persist]

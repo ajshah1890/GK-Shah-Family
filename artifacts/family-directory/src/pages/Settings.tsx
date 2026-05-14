@@ -1,4 +1,4 @@
-import { useFamilyStore } from "@/hooks/useFamilyStore";
+import { useFamilyStore, GITHUB_HYDRATION_DISABLED_KEY } from "@/hooks/useFamilyStore";
 import { useTheme } from "@/hooks/useTheme";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,9 @@ export default function Settings() {
   const [connTestState, setConnTestState] = useState<"idle" | "testing" | "done">("idle");
   const [connTestResult, setConnTestResult] = useState<ConnectionTestResult | null>(null);
   const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostic[]>([]);
+  const [githubHydrationDisabled, setGithubHydrationDisabled] = useState(
+    () => !!localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)
+  );
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const handleTestConnection = useCallback(async () => {
@@ -807,6 +810,46 @@ export default function Settings() {
               )}
             </CardContent>
           )}
+        </Card>
+      )}
+
+      {/* Debug — Persistence Controls (admin only) */}
+      {isAdmin && (
+        <Card className="border-muted/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif text-sm flex items-center gap-2 text-muted-foreground">
+              Debug — Persistence Controls
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Use to isolate data-disappearing issues. When GitHub hydration is disabled
+              the app reads only from this device&rsquo;s localStorage, so you can confirm
+              whether remote sync is overwriting local edits. Takes effect on next page load.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start justify-between gap-4 p-3 rounded-lg border border-muted bg-muted/20">
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium">Disable GitHub hydration</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  When ON, GitHub reads are skipped — only localStorage is used. Make an edit,
+                  reload, and check if it persists. If it does, remote sync was the culprit.
+                </p>
+              </div>
+              <Switch
+                checked={githubHydrationDisabled}
+                onCheckedChange={(v) => {
+                  setGithubHydrationDisabled(v);
+                  if (v) {
+                    localStorage.setItem(GITHUB_HYDRATION_DISABLED_KEY, "1");
+                    toast.info("GitHub hydration disabled — takes effect on next page load");
+                  } else {
+                    localStorage.removeItem(GITHUB_HYDRATION_DISABLED_KEY);
+                    toast.info("GitHub hydration re-enabled — takes effect on next page load");
+                  }
+                }}
+              />
+            </div>
+          </CardContent>
         </Card>
       )}
 

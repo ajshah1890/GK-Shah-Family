@@ -1,0 +1,150 @@
+STOP patching individual fields.
+
+There is still a deeper persistence overwrite issue affecting:
+
+* member edits
+* birthdays
+* gender
+* generation
+* blood group
+* new member creation
+* moments creation
+
+Symptoms:
+Changes appear briefly, then disappear or revert.
+Moments exit immediately without persisting.
+New members fail to remain saved.
+
+This strongly indicates:
+
+* hydration overwrite
+* stale remote sync overwrite
+* Zustand persistence race
+* async store replacement
+* optimistic UI rollback
+* or save pipeline failure
+
+Focus ONLY on tracing the full persistence lifecycle.
+
+====================================
+TASK 1 — TRACE SAVE FLOW
+========================
+
+For:
+
+* updateMember
+* createMember
+* createMoment
+* syncToGitHub
+* hydration/init
+
+Add detailed logs:
+
+1. INPUT PAYLOAD
+2. STORE AFTER LOCAL WRITE
+3. LOCALSTORAGE AFTER WRITE
+4. GITHUB PAYLOAD
+5. HYDRATION PAYLOAD
+6. STORE AFTER HYDRATION
+
+Use grouped console logs:
+console.group("[GKShah Save Trace]")
+
+====================================
+TASK 2 — IDENTIFY OVERWRITE SOURCE
+==================================
+
+Detect exactly where data disappears:
+
+Possible causes:
+
+* stale GitHub fetch replacing fresh local state
+* hydration running after save
+* sync completing with old payload
+* Zustand persist middleware restoring stale snapshot
+* store set() replacing entire members array incorrectly
+* object merge dropping fields
+* save promise rejected silently
+* optimistic navigation before persistence completes
+
+====================================
+TASK 3 — FREEZE HYDRATION DURING SAVE
+=====================================
+
+Add global flags:
+
+isHydrating
+isSyncing
+isSaving
+
+Rules:
+
+* hydration cannot overwrite during save
+* sync cannot overwrite newer local timestamps
+* init cannot rerun while editing
+
+====================================
+TASK 4 — ADD VERSION/TIMESTAMP CHECKS
+=====================================
+
+Each member and moment should include:
+updatedAt
+
+Before replacing local state with remote:
+ONLY overwrite if remote.updatedAt is newer.
+
+Never overwrite newer local edits with stale remote payloads.
+
+====================================
+TASK 5 — VERIFY ZUSTAND IMMUTABILITY
+====================================
+
+Audit ALL set() calls.
+
+Ensure updates:
+
+* merge correctly
+* preserve existing fields
+* do not replace nested objects accidentally
+
+====================================
+TASK 6 — TEMPORARILY DISABLE REMOTE HYDRATION
+=============================================
+
+Add a debug toggle:
+“Disable GitHub hydration”
+
+Test:
+
+* create member
+* edit birthday
+* save moment
+
+If everything works locally afterward,
+the issue is confirmed to be remote overwrite.
+
+====================================
+TASK 7 — SAVE ACKNOWLEDGEMENT
+=============================
+
+Do NOT navigate away after save until:
+
+* local store updated
+* localStorage updated
+* optional sync completed successfully
+
+Add visible:
+“Saving…”
+“Saved locally”
+“Synced to GitHub”
+
+====================================
+IMPORTANT
+=========
+
+Do NOT redesign UI.
+Do NOT modify tree rendering.
+Do NOT modify import logic.
+
+Goal:
+Find the SINGLE root cause causing saves to disappear/revert across the entire app.

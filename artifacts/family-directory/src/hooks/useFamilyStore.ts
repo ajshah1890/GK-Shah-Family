@@ -12,6 +12,72 @@ import { checkAndClearPostResetFlag, logHydration } from '../lib/hardReset';
 const STORAGE_KEY = 'gkshah_family_members';
 const SCHEMA_VERSION = 2;
 
+// ─── GitHub hydration disable toggle ─────────────────────────────────────────
+
+/**
+ * localStorage key for the "Disable GitHub hydration" debug toggle.
+ * When present, all GitHub reads are skipped on init — only localStorage is used.
+ * Set/clear from Settings › Debug section.
+ */
+export const GITHUB_HYDRATION_DISABLED_KEY = 'gkshah_disable_github_hydration';
+
+// ─── Persistence guards ───────────────────────────────────────────────────────
+//
+// _isSaving:
+//   true while addMember / updateMember is executing. Prevents a concurrent
+//   GitHub fetch response from blindly overwriting a fresh local write.
+//   Auto-clears after 8 s to handle any edge case where the store unmounts
+//   before the timer fires.
+//
+// _localSaveTimestamp:
+//   Epoch-ms of the most recent call to save(). Used by smartMergeMembers to
+//   know that our local data was written more recently than GitHub returned.
+
+let _isSaving = false;
+let _isSavingTimer: ReturnType<typeof setTimeout> | null = null;
+let _localSaveTimestamp = 0;
+
+function setSaving(): void {
+  _isSaving = true;
+  if (_isSavingTimer) clearTimeout(_isSavingTimer);
+  _isSavingTimer = setTimeout(() => { _isSaving = false; }, 8000);
+}
+
+// ─── Smart merge ──────────────────────────────────────────────────────────────
+//
+// Replaces the previous blind overwrite of local state with GitHub data.
+//
+// Rules:
+//  • Local-only members (not yet synced to GitHub) are always preserved.
+//  • Remote-only members are adopted (added from another device/browser).
+//  • Conflicting members: whichever has the newer updatedAt timestamp wins.
+//
+// This ensures a freshly saved birthday / gender / blood group is NEVER
+// overwritten by a stale GitHub payload arriving milliseconds later.
+
+function smartMergeMembers(local: FamilyMember[], remote: FamilyMember[]): {
+  merged: FamilyMember[];
+  localWins: number; remoteWins: number; localOnly: number; remoteOnly: number;
+} {
+  const localById  = new Map(local.map(m => [m.id, m]));
+  const remoteById = new Map(remote.map(m => [m.id, m]));
+  const allIds     = new Set([...localById.keys(), ...remoteById.keys()]);
+  const merged: FamilyMember[] = [];
+  let localWins = 0, remoteWins = 0, localOnly = 0, remoteOnly = 0;
+
+  for (const id of allIds) {
+    const loc = localById.get(id);
+    const rem = remoteById.get(id);
+    if (!rem) { merged.push(loc!); localOnly++;  continue; }
+    if (!loc) { merged.push(rem);  remoteOnly++; continue; }
+    const localMs  = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
+    const remoteMs = rem.updatedAt ? new Date(rem.updatedAt).getTime() : 0;
+    if (localMs >= remoteMs) { merged.push(loc); localWins++;  }
+    else                     { merged.push(rem); remoteWins++; }
+  }
+  return { merged, localWins, remoteWins, localOnly, remoteOnly };
+}
+
 // ─── Stored format ────────────────────────────────────────────────────────────
 
 interface StoredData {
@@ -111,9 +177,11 @@ function load(): FamilyMember[] {
 }
 
 function save(members: FamilyMember[]) {
+  _localSaveTimestamp = Date.now();
   try {
     const data: StoredData = { version: SCHEMA_VERSION, members };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem('gkshah_local_save_at', String(_localSaveTimestamp));
   } catch {
     // localStorage quota exceeded — data remains in memory
   }
@@ -201,18 +269,70 @@ export function useFamilyStore() {
 
           if (raw.length > 0) {
             const migrated = migrateMembers(raw);
-            logHydration(`Members loaded from: GitHub (${migrated.length} member${migrated.length !== 1 ? "s" : ""})`);
-            setMembers(migrated);
-            save(migrated);
-            setIsLoaded(true);
+
+            // Guard 1 — block if a save is in progress: an in-flight GitHub response
+            // must not overwrite a local write that just happened.
+            if (_isSaving) {
+              logHydration(
+                `Members: GitHub response arrived during active save — skipping overwrite ` +
+                `(${migrated.length} remote ignored, ${local.length} local preserved)`
+              );
+              if (!cancelled) setIsLoaded(true);
+              return;
+            }
+
+            // Guard 2 — debug toggle set in Settings › Persistence Controls
+            if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
+              logHydration(
+                `Members: GitHub hydration disabled by debug toggle — keeping ${local.length} local members`
+              );
+              if (!cancelled) setIsLoaded(true);
+              return;
+            }
+
+            // Smart merge: per-member updatedAt comparison replaces blind overwrite.
+            // Local edits saved after the last GitHub sync always win.
+            const { merged, localWins, remoteWins, localOnly, remoteOnly } =
+              smartMergeMembers(local, migrated);
+
+            console.group("[GKShah Save Trace] HYDRATION PAYLOAD (members)");
+            console.log(
+              `Remote=${migrated.length}  Local=${local.length}  Merged=${merged.length}`
+            );
+            console.log(
+              `localWins=${localWins}  remoteWins=${remoteWins}  ` +
+              `localOnly=${localOnly}  remoteOnly=${remoteOnly}`
+            );
+            console.groupEnd();
+
+            logHydration(
+              `Members merged: ${merged.length} total | ` +
+              `localWins=${localWins} remoteWins=${remoteWins} ` +
+              `localOnly=${localOnly} remoteOnly=${remoteOnly}`
+            );
+
+            if (!cancelled) {
+              setMembers(merged);
+              save(merged);
+              setIsLoaded(true);
+            }
             return;
           }
 
-          // GitHub returned 0 members — directory is legitimately empty (e.g. post-reset).
-          // DO NOT fall back to local or sample data.
+          // GitHub returned 0 members.
+          if (localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)) {
+            logHydration(
+              `Members: GitHub hydration disabled — keeping ${local.length} local members (remote returned 0)`
+            );
+            if (!cancelled) setIsLoaded(true);
+            return;
+          }
+          // Legitimately empty directory (e.g. post-reset). DO NOT fall back to local data.
           logHydration("Members loaded from: GitHub (returned 0 members — directory is empty)");
-          setMembers([]);
-          setIsLoaded(true);
+          if (!cancelled) {
+            setMembers([]);
+            setIsLoaded(true);
+          }
           return;
         }
 
@@ -287,6 +407,10 @@ export function useFamilyStore() {
     );
     if (validationError) return { member: {} as FamilyMember, error: validationError };
 
+    // Mark saving BEFORE the write so any concurrent GitHub fetch response
+    // that resolves in the same tick will be blocked by the _isSaving guard.
+    setSaving();
+
     const allById = new Map(members.map(m => [m.id, m]));
     const id = crypto.randomUUID();
 
@@ -318,8 +442,24 @@ export function useFamilyStore() {
       updatedAt: now,
     };
 
+    console.group("[GKShah Save Trace] addMember");
+    console.log("PAYLOAD", {
+      id, fullName: member.fullName,
+      birthday: member.birthday, gender: member.gender,
+      bloodGroup: member.bloodGroup, generation: member.generation,
+    });
+
     const next = rebuildChildrenArrays([...members, newMember]);
     saveMembers(next);
+
+    console.log("STORE AFTER WRITE", { totalMembers: next.length, saved: next.find(m => m.id === id) });
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const lsList: Array<{ id: string }> = Array.isArray(parsed) ? parsed : (parsed?.members ?? []);
+      console.log("LOCALSTORAGE AFTER WRITE", lsList.find(m => m.id === id) ?? "❌ NOT FOUND");
+    } catch { console.warn("[GKShah] Could not verify localStorage after addMember"); }
+    console.groupEnd();
 
     logAudit({
       action: 'create',
@@ -337,11 +477,26 @@ export function useFamilyStore() {
     );
     if (validationError) return { error: validationError };
 
+    // Mark saving BEFORE the write so any concurrent GitHub fetch response
+    // that resolves in the same tick will be blocked by the _isSaving guard.
+    setSaving();
+
     const allById = new Map(members.map(m => [m.id, m]));
     const existing = allById.get(id);
     if (!existing) return { error: "Member not found" };
 
     const updated = { ...existing, ...updates, id, updatedAt: new Date().toISOString() } as FamilyMember;
+
+    console.group("[GKShah Save Trace] updateMember");
+    console.log("PAYLOAD", {
+      id, fullName: updated.fullName,
+      birthday: updated.birthday, gender: updated.gender,
+      bloodGroup: updated.bloodGroup,
+      generation: updated.generation, generationNumber: updated.generationNumber,
+    });
+    console.log("EXISTING before merge", {
+      birthday: existing.birthday, gender: existing.gender, bloodGroup: existing.bloodGroup,
+    });
 
     const parentChanged =
       updates.fatherId !== undefined || updates.motherId !== undefined;
@@ -356,6 +511,15 @@ export function useFamilyStore() {
       members.map(m => m.id === id ? updated : m)
     );
     saveMembers(next);
+
+    console.log("STORE AFTER WRITE", { totalMembers: next.length, saved: next.find(m => m.id === id) });
+    try {
+      const rawLs = localStorage.getItem(STORAGE_KEY);
+      const parsedLs = rawLs ? JSON.parse(rawLs) : null;
+      const lsList: Array<{ id: string }> = Array.isArray(parsedLs) ? parsedLs : (parsedLs?.members ?? []);
+      console.log("LOCALSTORAGE AFTER WRITE", lsList.find(m => m.id === id) ?? "❌ NOT FOUND");
+    } catch { console.warn("[GKShah] Could not verify localStorage after updateMember"); }
+    console.groupEnd();
 
     const changes = diffMembers(existing, updated);
     if (Object.keys(changes).length > 0) {

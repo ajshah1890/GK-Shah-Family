@@ -14,7 +14,7 @@ import {
   Download, Upload, Info, FileSpreadsheet, Shield,
   Camera, Database, AlertTriangle, CheckCircle2,
   Clock, Archive, History, Trash2, ChevronDown, ChevronUp,
-  CloudUpload, RefreshCw, Wifi, WifiOff,
+  CloudUpload, RefreshCw, Wifi, WifiOff, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState, useMemo, useCallback } from "react";
@@ -96,6 +96,61 @@ export default function Settings() {
     await handleSyncMembers();
     await handleSyncMoments();
   }, [handleSyncMembers, handleSyncMoments]);
+
+  // ── Reset database ────────────────────────────────────────────────────────
+
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleReset = useCallback(async () => {
+    if (resetConfirmText !== "RESET" || !isAdmin) return;
+    setIsResetting(true);
+
+    try {
+      // 1. Reset GitHub files (best-effort — don't block local reset if offline)
+      await Promise.allSettled([
+        syncToGitHub("members", { version: 2, members: [] }),
+        syncToGitHub("moments", []),
+        syncToGitHub("settings", { _resetAt: new Date().toISOString() }),
+      ]);
+
+      // 2. Preserve admin credentials before wiping
+      const savedPassword = localStorage.getItem("gkshah_admin_password");
+      const savedMode     = localStorage.getItem("gkshah_admin_mode");
+
+      // 3. Clear every gkshah_* localStorage key
+      Object.keys(localStorage)
+        .filter(k => k.startsWith("gkshah_"))
+        .forEach(k => localStorage.removeItem(k));
+
+      // Restore preserved values
+      if (savedPassword) localStorage.setItem("gkshah_admin_password", savedPassword);
+      if (savedMode)     localStorage.setItem("gkshah_admin_mode", savedMode);
+
+      // 4. Delete both IndexedDB databases
+      await Promise.allSettled([
+        new Promise<void>(resolve => {
+          const req = indexedDB.deleteDatabase("gkshah_photos");
+          req.onsuccess = () => resolve();
+          req.onerror   = () => resolve();
+          req.onblocked = () => resolve();
+        }),
+        new Promise<void>(resolve => {
+          const req = indexedDB.deleteDatabase("gkshah_moment_photos");
+          req.onsuccess = () => resolve();
+          req.onerror   = () => resolve();
+          req.onblocked = () => resolve();
+        }),
+      ]);
+
+      // 5. Force full page reload — all React state is discarded
+      window.location.reload();
+    } catch {
+      toast.error("Reset failed. Please try again.");
+      setIsResetting(false);
+    }
+  }, [resetConfirmText, isAdmin]);
 
   const inlinePhotoCount = useMemo(
     () => members.filter(m => m.photo?.startsWith("data:")).length,
@@ -666,6 +721,42 @@ export default function Settings() {
         </Card>
       )}
 
+      {/* Danger Zone (admin only) */}
+      {isAdmin && (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="font-serif flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription>
+              Irreversible actions that permanently delete data. Use with caution.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+              <div className="space-y-1 min-w-0">
+                <p className="text-sm font-semibold">Reset All Family Data</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Clears all members, moments, photos, audit log, and relationship data from this
+                  device and the shared GitHub repository. Admin password and theme are preserved.
+                  The app will reload to a clean state ready for fresh import.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="shrink-0 gap-2"
+                onClick={() => { setResetConfirmText(""); setResetDialogOpen(true); }}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="text-center text-sm text-muted-foreground pt-4">
         <p>G K Shah Family Chronicle v2.1</p>
         <p>Built with care for the family.</p>
@@ -727,6 +818,84 @@ export default function Settings() {
             <Button onClick={applyRestore} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
               <Upload className="w-4 h-4" />
               Apply Restore
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Reset Confirmation Dialog */}
+      <Dialog
+        open={resetDialogOpen}
+        onOpenChange={(o) => { if (!isResetting) { setResetDialogOpen(o); setResetConfirmText(""); } }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Reset All Family Data?
+            </DialogTitle>
+            <DialogDescription className="space-y-1 pt-1">
+              This will permanently erase <strong>everything</strong> — members, moments, photos,
+              audit log, relationship history, and GitHub repository data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-1.5 text-sm">
+              <p className="font-medium text-destructive">What will be deleted:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                <li>All family members and relationship data</li>
+                <li>All moments and photo metadata</li>
+                <li>All member and moment photos (IndexedDB)</li>
+                <li>Audit log and activity history</li>
+                <li>GitHub repository data (members.json, moments.json)</li>
+              </ul>
+              <p className="font-medium text-green-700 dark:text-green-400 pt-1">What is kept:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                <li>Admin password and login session</li>
+                <li>App theme (light / dark)</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Type <code className="bg-muted px-1.5 py-0.5 rounded text-destructive font-bold">RESET</code> to confirm
+              </label>
+              <Input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value.toUpperCase())}
+                placeholder="Type RESET here"
+                disabled={isResetting}
+                className="font-mono border-destructive/40 focus-visible:ring-destructive/40"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setResetDialogOpen(false); setResetConfirmText(""); }}
+              disabled={isResetting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReset}
+              disabled={resetConfirmText !== "RESET" || isResetting}
+              className="gap-2"
+            >
+              {isResetting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Resetting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Reset Everything
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

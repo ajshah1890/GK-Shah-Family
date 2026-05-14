@@ -364,6 +364,17 @@ export default function Moments() {
           onClose={() => setShowSlideshow(false)}
         />
       )}
+
+      {/* Mobile FAB — admin only, above bottom nav */}
+      {isAdmin && (
+        <button
+          onClick={() => setLocation("/moments/new")}
+          className="fixed bottom-24 right-4 z-30 md:hidden w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center"
+          aria-label="Create new moment"
+        >
+          <Camera className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
 }

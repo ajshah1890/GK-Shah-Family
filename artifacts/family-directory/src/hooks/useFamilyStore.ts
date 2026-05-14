@@ -7,6 +7,7 @@ import {
 } from '../lib/familyTree';
 import { logAudit, diffMembers } from '../lib/auditLog';
 import { loadFromGitHub } from './useGitHubSync';
+import { checkAndClearPostResetFlag } from '../lib/hardReset';
 
 const STORAGE_KEY = 'gkshah_family_members';
 const SCHEMA_VERSION = 2;
@@ -171,6 +172,13 @@ export function useFamilyStore() {
     let cancelled = false;
 
     async function init() {
+      // Post-reset guard — if the user just completed a hard reset, skip all
+      // data loading so GitHub doesn't restore ghost members on the first load.
+      if (checkAndClearPostResetFlag()) {
+        if (!cancelled) { setMembers([]); setIsLoaded(true); }
+        return;
+      }
+
       // 1. Show localStorage data immediately so UI is not blank
       const local = load();
       if (local.length > 0 && !cancelled) {

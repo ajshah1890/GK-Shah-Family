@@ -25,6 +25,7 @@ import { photoRepository } from "@/lib/repository";
 import { loadMoments } from "@/lib/momentsRepository";
 import { FamilyMember } from "@/types/family";
 import { syncToGitHub } from "@/hooks/useGitHubSync";
+import { hardResetAllData } from "@/lib/hardReset";
 import { useMomentsStore } from "@/hooks/useMomentsStore";
 
 interface RestorePreview {
@@ -106,46 +107,15 @@ export default function Settings() {
   const handleReset = useCallback(async () => {
     if (resetConfirmText !== "RESET" || !isAdmin) return;
     setIsResetting(true);
-
     try {
-      // 1. Reset GitHub files (best-effort — don't block local reset if offline)
-      await Promise.allSettled([
-        syncToGitHub("members", { version: 2, members: [] }),
-        syncToGitHub("moments", []),
-        syncToGitHub("settings", { _resetAt: new Date().toISOString() }),
-      ]);
-
-      // 2. Preserve admin credentials before wiping
-      const savedPassword = localStorage.getItem("gkshah_admin_password");
-      const savedMode     = localStorage.getItem("gkshah_admin_mode");
-
-      // 3. Clear every gkshah_* localStorage key
-      Object.keys(localStorage)
-        .filter(k => k.startsWith("gkshah_"))
-        .forEach(k => localStorage.removeItem(k));
-
-      // Restore preserved values
-      if (savedPassword) localStorage.setItem("gkshah_admin_password", savedPassword);
-      if (savedMode)     localStorage.setItem("gkshah_admin_mode", savedMode);
-
-      // 4. Delete both IndexedDB databases
-      await Promise.allSettled([
-        new Promise<void>(resolve => {
-          const req = indexedDB.deleteDatabase("gkshah_photos");
-          req.onsuccess = () => resolve();
-          req.onerror   = () => resolve();
-          req.onblocked = () => resolve();
-        }),
-        new Promise<void>(resolve => {
-          const req = indexedDB.deleteDatabase("gkshah_moment_photos");
-          req.onsuccess = () => resolve();
-          req.onerror   = () => resolve();
-          req.onblocked = () => resolve();
-        }),
-      ]);
-
-      // 5. Force full page reload — all React state is discarded
-      window.location.reload();
+      // Delegates to the centralized hard-reset module which:
+      //   1. Saves admin credentials
+      //   2. Wipes all gkshah_* localStorage + sessionStorage
+      //   3. Sets post-reset flag (blocks GitHub restore on next load)
+      //   4. Deletes IndexedDB databases (photos + moment photos)
+      //   5. Clears GitHub JSON (members / moments / settings)
+      //   6. Hard-reloads — we never reach the line below
+      await hardResetAllData();
     } catch {
       toast.error("Reset failed. Please try again.");
       setIsResetting(false);

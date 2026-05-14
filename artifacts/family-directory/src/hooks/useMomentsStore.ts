@@ -8,6 +8,7 @@ import {
   makeMomentPhotoKey,
 } from "@/lib/momentsRepository";
 import { loadFromGitHub } from "./useGitHubSync";
+import { checkAndClearPostResetFlag } from "@/lib/hardReset";
 
 function generateId(): string {
   return `moment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -37,6 +38,12 @@ export function useMomentsStore() {
     let cancelled = false;
 
     async function init() {
+      // Post-reset guard — skip all loading immediately after a hard reset.
+      if (checkAndClearPostResetFlag()) {
+        if (!cancelled) { setMoments([]); setIsLoaded(true); }
+        return;
+      }
+
       const local = loadMoments();
       if (local.length > 0 && !cancelled) {
         setMoments(local);

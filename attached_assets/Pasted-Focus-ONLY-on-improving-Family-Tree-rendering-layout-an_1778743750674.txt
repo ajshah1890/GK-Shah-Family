@@ -1,0 +1,114 @@
+Focus ONLY on improving Family Tree rendering/layout and viewport behavior.
+
+Do NOT modify import logic or relationship persistence.
+
+Current problem:
+The tree data is correct, but the rendering becomes too sparse and difficult to navigate for 100+ members.
+
+Issues:
+
+* excessive horizontal whitespace
+* very small cards
+* too much drag space before reaching members
+* viewport not centered intelligently
+* generations spread too far apart
+* tree difficult to read on desktop and mobile
+
+GOAL:
+Convert the tree into a compact, readable genealogy layout optimized for large family structures.
+
+====================================
+LAYOUT IMPROVEMENTS
+===================
+
+1. Implement compact hierarchical layout:
+
+* tighter sibling spacing
+* tighter generation spacing
+* spouse cards grouped visually
+* children centered under parents
+
+2. Auto-center tree on load:
+
+* center on lineage root
+* auto-fit visible members into viewport
+
+3. Add “Fit Tree” button:
+
+* automatically zoom/pan to fit all visible members
+
+4. Add “Focus Member” mode:
+
+* clicking a member centers tree on them
+* nearby relatives emphasized
+* distant branches faded slightly
+
+5. Reduce empty whitespace:
+
+* dynamic spacing based on subtree size
+* avoid infinite canvas feel
+
+====================================
+VIEWPORT / UX IMPROVEMENTS
+==========================
+
+6. Improve zoom behavior:
+
+* smoother zoom
+* min/max zoom bounds
+* zoom centered on cursor
+
+7. Add minimap navigator for large trees.
+
+8. Add compact mode toggle:
+
+* smaller cards
+* denser layout
+* optimized for 100+ members
+
+9. Improve mobile tree UX:
+
+* pinch zoom
+* inertial panning
+* easier centering
+
+====================================
+VISUAL IMPROVEMENTS
+===================
+
+10. Make generations visually clearer:
+
+* horizontal generation lanes
+* subtle row separators
+* generation labels on left side
+
+11. Improve spouse visualization:
+
+* paired cards closer together
+* cleaner connector lines
+
+12. Improve child connectors:
+
+* avoid overlapping lines
+* cleaner vertical hierarchy
+
+====================================
+PERFORMANCE
+===========
+
+13. Optimize rendering for large trees:
+
+* avoid rerendering entire tree on pan/zoom
+* memoize subtree rendering
+* virtualize off-screen branches if needed
+
+====================================
+IMPORTANT
+=========
+
+Do NOT rewrite the backend or import engine.
+Do NOT change relationship logic.
+Only improve rendering/layout/viewport behavior.
+
+Goal:
+A clean, compact, modern genealogy viewer that works smoothly for 100+ connected family members.

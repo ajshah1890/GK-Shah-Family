@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, Settings, Network, FileSpreadsheet,
-  Lock, GitMerge, BarChart2, Shield, Search, Camera,
+  Lock, GitMerge, BarChart2, Shield, Search, Camera, Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -23,7 +23,8 @@ const navItems = [
 ];
 
 const adminNavItems = [
-  { name: "Data Health",   href: "/data-health",   icon: Shield },
+  { name: "Data Health",    href: "/data-health",    icon: Shield },
+  { name: "Debug Storage",  href: "/debug-storage",  icon: Database },
 ];
 
 export function Sidebar() {

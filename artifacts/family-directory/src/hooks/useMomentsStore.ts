@@ -8,7 +8,7 @@ import {
   makeMomentPhotoKey,
 } from "@/lib/momentsRepository";
 import { loadFromGitHub } from "./useGitHubSync";
-import { checkAndClearPostResetFlag } from "@/lib/hardReset";
+import { checkAndClearPostResetFlag, logHydration } from "@/lib/hardReset";
 
 function generateId(): string {
   return `moment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -38,14 +38,17 @@ export function useMomentsStore() {
     let cancelled = false;
 
     async function init() {
-      // Post-reset guard — skip all loading immediately after a hard reset.
+      // Post-reset guard — module-level cache ensures this returns true for
+      // ALL stores in the same page load (flag is consumed once, then cached).
       if (checkAndClearPostResetFlag()) {
+        logHydration("Moments loaded from: RESET — showing 0 moments (GitHub restore blocked)");
         if (!cancelled) { setMoments([]); setIsLoaded(true); }
         return;
       }
 
       const local = loadMoments();
       if (local.length > 0 && !cancelled) {
+        logHydration(`Moments loaded from: localStorage (${local.length} moment${local.length !== 1 ? "s" : ""} — showing while GitHub loads)`);
         setMoments(local);
         setIsLoaded(true);
       }
@@ -53,18 +56,32 @@ export function useMomentsStore() {
       try {
         const remote = await loadFromGitHub<Moment[]>("moments");
         if (cancelled) return;
-        if (remote && Array.isArray(remote) && remote.length > 0) {
-          setMoments(remote);
-          saveMoments(remote);
+
+        if (remote !== null) {
+          if (Array.isArray(remote) && remote.length > 0) {
+            logHydration(`Moments loaded from: GitHub (${remote.length} moment${remote.length !== 1 ? "s" : ""})`);
+            setMoments(remote);
+            saveMoments(remote);
+            setIsLoaded(true);
+            return;
+          }
+          // GitHub returned 0 moments — show empty, do NOT fall back to local
+          logHydration("Moments loaded from: GitHub (returned 0 moments — empty)");
+          setMoments([]);
           setIsLoaded(true);
           return;
         }
+
+        // null = GitHub unreachable
+        logHydration(`Moments loaded from: localStorage (${local.length} moment${local.length !== 1 ? "s" : ""} — GitHub unreachable)`);
       } catch {
-        // network error — use local
+        logHydration(`Moments loaded from: localStorage (${local.length} moment${local.length !== 1 ? "s" : ""} — GitHub threw)`);
       }
 
       if (!cancelled) {
-        if (local.length === 0) setMoments([]);
+        if (local.length === 0) {
+          logHydration("Moments loaded from: empty (no localStorage data, GitHub unreachable)");
+        }
         setIsLoaded(true);
       }
     }

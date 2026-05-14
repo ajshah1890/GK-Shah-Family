@@ -7,7 +7,7 @@ import {
 } from '../lib/familyTree';
 import { logAudit, diffMembers } from '../lib/auditLog';
 import { loadFromGitHub } from './useGitHubSync';
-import { checkAndClearPostResetFlag } from '../lib/hardReset';
+import { checkAndClearPostResetFlag, logHydration } from '../lib/hardReset';
 
 const STORAGE_KEY = 'gkshah_family_members';
 const SCHEMA_VERSION = 2;
@@ -172,46 +172,62 @@ export function useFamilyStore() {
     let cancelled = false;
 
     async function init() {
-      // Post-reset guard — if the user just completed a hard reset, skip all
-      // data loading so GitHub doesn't restore ghost members on the first load.
+      // Post-reset guard — module-level cache in hardReset.ts ensures ALL stores
+      // (useFamilyStore, useMomentsStore) see the same result for this page load
+      // even though each calls checkAndClearPostResetFlag() independently.
       if (checkAndClearPostResetFlag()) {
+        logHydration("Members loaded from: RESET — showing 0 members (GitHub restore blocked)");
         if (!cancelled) { setMembers([]); setIsLoaded(true); }
         return;
       }
 
-      // 1. Show localStorage data immediately so UI is not blank
+      // 1. Show localStorage data immediately so the UI is not blank
       const local = load();
       if (local.length > 0 && !cancelled) {
+        logHydration(`Members loaded from: localStorage (${local.length} member${local.length !== 1 ? "s" : ""} — showing while GitHub loads)`);
         setMembers(local);
         setIsLoaded(true);
       }
 
-      // 2. Try fetching from GitHub (via API proxy)
+      // 2. Try GitHub (authoritative source)
       try {
         const remote = await loadFromGitHub<{ version?: number; members?: any[] } | any[]>("members");
         if (cancelled) return;
-        if (remote) {
+
+        if (remote !== null) {
           const raw = Array.isArray(remote)
             ? remote
             : (remote as { members?: any[] }).members ?? [];
+
           if (raw.length > 0) {
             const migrated = migrateMembers(raw);
+            logHydration(`Members loaded from: GitHub (${migrated.length} member${migrated.length !== 1 ? "s" : ""})`);
             setMembers(migrated);
             save(migrated);
             setIsLoaded(true);
             return;
           }
+
+          // GitHub returned 0 members — directory is legitimately empty (e.g. post-reset).
+          // DO NOT fall back to local or sample data.
+          logHydration("Members loaded from: GitHub (returned 0 members — directory is empty)");
+          setMembers([]);
+          setIsLoaded(true);
+          return;
         }
+
+        // null = GitHub unreachable (network error or non-OK HTTP response)
+        logHydration(`Members loaded from: localStorage (${local.length} member${local.length !== 1 ? "s" : ""} — GitHub unreachable)`);
       } catch {
-        // network error — fall through to local
+        logHydration(`Members loaded from: localStorage (${local.length} member${local.length !== 1 ? "s" : ""} — GitHub threw)`);
       }
 
-      // 3. Fall back: seed sample data if still empty
+      // 3. GitHub unavailable — keep showing local data (already set above).
+      //    If localStorage is also empty, show an empty directory.
+      //    DO NOT seed SAMPLE_MEMBERS.
       if (!cancelled) {
         if (local.length === 0) {
-          const initial = migrateMembers(SAMPLE_MEMBERS as any[]);
-          setMembers(initial);
-          save(initial);
+          logHydration("Members loaded from: empty (no localStorage data, GitHub unreachable)");
         }
         setIsLoaded(true);
       }

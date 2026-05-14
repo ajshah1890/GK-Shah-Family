@@ -21,7 +21,11 @@ let _isMomentSavingTimer: ReturnType<typeof setTimeout> | null = null;
 function setSavingMoment(): void {
   _isMomentSaving = true;
   if (_isMomentSavingTimer) clearTimeout(_isMomentSavingTimer);
-  _isMomentSavingTimer = setTimeout(() => { _isMomentSaving = false; }, 8000);
+  // 3 s max — same as members store
+  _isMomentSavingTimer = setTimeout(() => {
+    _isMomentSaving = false;
+    console.log('[GKShah] setSavingMoment: _isMomentSaving auto-cleared after 3 s timeout');
+  }, 3000);
 }
 
 // ─── Smart merge ──────────────────────────────────────────────────────────────
@@ -207,16 +211,21 @@ export function useMomentsStore() {
         updatedAt: now,
       };
 
-      // Mark saving BEFORE the write so any concurrent GitHub fetch response
-      // that resolves in the same tick will be blocked by the _isMomentSaving guard.
-      setSavingMoment();
-      persist([moment, ...moments]);
-
-      console.group("[GKShah Save Trace] createMoment");
-      console.log("CREATED", { id: moment.id, caption: moment.caption, updatedAt: moment.updatedAt });
-      console.groupEnd();
-
-      return moment;
+      console.group('[GKShah] createMoment START');
+      try {
+        // Mark saving BEFORE the write so any concurrent GitHub fetch response
+        // that resolves in the same tick will be blocked by the _isMomentSaving guard.
+        setSavingMoment();
+        console.log('[GKShah] createMoment: _isMomentSaving set, lock acquired');
+        persist([moment, ...moments]);
+        console.log('[GKShah] createMoment END —', moment.id, moment.caption);
+        return moment;
+      } catch (err) {
+        console.error('[GKShah] createMoment FAILURE (exception):', err);
+        throw err;
+      } finally {
+        console.groupEnd();
+      }
     },
     [moments, persist]
   );

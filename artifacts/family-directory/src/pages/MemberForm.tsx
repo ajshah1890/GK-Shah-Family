@@ -460,20 +460,46 @@ export default function MemberForm() {
       motherId:         memberData.motherId,
       spouseId:         memberData.spouseId,
     });
-    setSaveStatus('saving');
-    if (isEditing && id) {
-      const result = updateMember(id, memberData);
-      if (result.error) { toast.error(result.error); setSaveStatus('idle'); return; }
-      setSaveStatus('saved');
-      toast.success("Member updated successfully");
-      // Small delay so the "Saved locally ✓" indicator is briefly visible before navigation.
-      setTimeout(() => setLocation(`/members/${id}`), 700);
-    } else {
-      const result = addMember(memberData);
-      if (result.error) { toast.error(result.error); setSaveStatus('idle'); return; }
-      setSaveStatus('saved');
-      toast.success("Member added successfully");
-      setTimeout(() => setLocation(`/members/${result.member.id}`), 700);
+    // Track whether the save actually succeeded so finally can set the right status.
+    // Without try/finally: any thrown exception leaves saveStatus='saving' forever,
+    // permanently disabling the submit button (REGRESSION from adding setSaveStatus).
+    let savedSuccessfully = false;
+    console.group('[GKShah] performSave START');
+    console.log('[GKShah] performSave', { isEditing, id, currentSaveStatus: saveStatus });
+    try {
+      setSaveStatus('saving');
+      if (isEditing && id) {
+        console.log('[GKShah] performSave calling updateMember...');
+        const result = updateMember(id, memberData);
+        if (result.error) {
+          console.warn('[GKShah] performSave FAILURE (updateMember validation):', result.error);
+          toast.error(result.error);
+          return; // finally will set saveStatus='idle'
+        }
+        savedSuccessfully = true;
+        toast.success("Member updated successfully");
+        console.log('[GKShah] performSave END (edit) — navigating to', id, 'in 700ms');
+        setTimeout(() => setLocation(`/members/${id}`), 700);
+      } else {
+        console.log('[GKShah] performSave calling addMember...');
+        const result = addMember(memberData);
+        if (result.error) {
+          console.warn('[GKShah] performSave FAILURE (addMember validation):', result.error);
+          toast.error(result.error);
+          return; // finally will set saveStatus='idle'
+        }
+        savedSuccessfully = true;
+        toast.success("Member added successfully");
+        console.log('[GKShah] performSave END (add) — navigating to', result.member.id, 'in 700ms');
+        setTimeout(() => setLocation(`/members/${result.member.id}`), 700);
+      }
+    } catch (err) {
+      console.error('[GKShah] performSave FAILURE (unhandled exception):', err);
+      toast.error(`Save failed unexpectedly — ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSaveStatus(savedSuccessfully ? 'saved' : 'idle');
+      console.log('[GKShah] performSave FINALLY — saveStatus =', savedSuccessfully ? 'saved' : 'idle');
+      console.groupEnd();
     }
   };
 

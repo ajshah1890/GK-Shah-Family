@@ -1,0 +1,139 @@
+Critical regression after introducing hydration/save guards.
+
+Current symptoms:
+
+* cannot add member
+* cannot edit member
+* cannot import
+* cannot save moments
+* reset completed but all writes are blocked
+
+This started AFTER:
+
+* _isSaving
+* hydration freeze
+* smart merge
+* timestamp guards
+
+Root cause is likely:
+A global lock/guard is never being released.
+
+Focus ONLY on debugging mutation flow.
+
+====================================
+TASK 1 — TRACE ALL GUARDS
+=========================
+
+Add visible logs for:
+
+* isSaving
+* isHydrating
+* isSyncing
+
+At:
+
+* addMember
+* updateMember
+* importMembers
+* createMoment
+* hydration init
+* syncToGitHub
+
+Log:
+START
+END
+FAILURE
+FINALLY
+
+====================================
+TASK 2 — ENSURE LOCK RELEASE
+============================
+
+Every mutation flow MUST use:
+
+try {
+...
+} finally {
+release locks
+}
+
+Ensure:
+setSaving(false)
+setHydrating(false)
+setSyncing(false)
+
+always execute even on error.
+
+====================================
+TASK 3 — CHECK EARLY RETURNS
+============================
+
+Audit ALL guards like:
+
+if (_isSaving) return
+if (isHydrating) return
+
+Ensure they:
+
+* log WHY they triggered
+* do not permanently deadlock the app
+
+====================================
+TASK 4 — TEMPORARILY DISABLE GUARDS
+===================================
+
+Add temporary debug toggles:
+
+* Disable save lock
+* Disable hydration freeze
+* Disable merge protection
+
+Test:
+
+* add member
+* edit member
+* import
+
+If writes start working:
+the lock system is confirmed as culprit.
+
+====================================
+TASK 5 — IMPORT FLOW
+====================
+
+Trace:
+import -> store update -> localStorage -> sync
+
+Identify exactly where import aborts.
+
+Add visible import error display.
+
+====================================
+TASK 6 — FAIL LOUDLY
+====================
+
+Never silently block writes.
+
+If a guard prevents mutation:
+show toast:
+"Write blocked: hydration in progress"
+
+====================================
+IMPORTANT
+=========
+
+Do NOT modify:
+
+* family tree renderer
+* UI layout
+* import parser
+
+Goal:
+Restore ability to:
+
+* add
+* edit
+* import
+* save moments
+
+without permanent guard deadlocks.

@@ -1,0 +1,120 @@
+The save operation now reports SUCCESS with no errors, but changes do not visually persist afterward.
+
+This means:
+
+* mutation pipeline succeeds
+* but state/UI is being overwritten or not re-rendering correctly afterward
+
+Focus ONLY on tracing the exact persistence path.
+
+====================================
+TASK 1 — VERIFY ACTUAL LOCALSTORAGE
+===================================
+
+Immediately after successful save:
+
+1. Read localStorage directly:
+   localStorage.getItem("gkshah_members")
+
+2. Parse it.
+
+3. Verify the edited member actually contains:
+
+* updated birthday
+* updated gender
+* updated bloodGroup
+* updated generation
+
+4. Log:
+   LOCALSTORAGE AFTER SAVE
+
+====================================
+TASK 2 — VERIFY STORE STATE
+===========================
+
+Immediately after:
+setMembers(next)
+
+Log:
+STORE AFTER SAVE
+
+Then 2 seconds later:
+setTimeout(() => log current store, 2000)
+
+Goal:
+Detect whether store reverts later.
+
+====================================
+TASK 3 — TRACE HYDRATION REPLACEMENT
+====================================
+
+Add logs in ALL hydration/init paths:
+
+HYDRATION START
+REMOTE PAYLOAD
+MERGED RESULT
+FINAL STORE AFTER HYDRATION
+
+Goal:
+Detect exactly when the saved member disappears.
+
+====================================
+TASK 4 — VERIFY UPDATEDAT
+=========================
+
+Log:
+
+* local updatedAt
+* remote updatedAt
+
+Ensure smart merge is actually choosing the newer local version.
+
+====================================
+TASK 5 — VERIFY REACT RERENDER
+==============================
+
+Add logs in:
+
+* MemberProfile
+* MemberForm
+* Directory card
+
+Log received props after save.
+
+Possible issue:
+components rendering stale memoized data.
+
+====================================
+TASK 6 — VERIFY TREE CACHE
+==========================
+
+If tree/profile data uses memoized derived structures:
+ensure cache invalidates after save.
+
+Possible issue:
+save succeeds but derived tree still uses old reference.
+
+====================================
+TASK 7 — TEMPORARILY DISABLE REMOTE HYDRATION
+=============================================
+
+Turn ON:
+Disable GitHub hydration
+
+Then:
+
+* edit birthday
+* save
+* refresh
+
+If changes persist now:
+remote merge still incorrectly overwriting local state.
+
+====================================
+IMPORTANT
+=========
+
+Do NOT patch fields anymore.
+
+Goal:
+Identify the SINGLE point where successfully saved data disappears afterward.

@@ -1,4 +1,4 @@
-import { useFamilyStore, GITHUB_HYDRATION_DISABLED_KEY } from "@/hooks/useFamilyStore";
+import { useFamilyStore, GITHUB_HYDRATION_DISABLED_KEY, SAVE_LOCK_DISABLED_KEY, MERGE_PROTECTION_DISABLED_KEY } from "@/hooks/useFamilyStore";
 import { useTheme } from "@/hooks/useTheme";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,12 @@ export default function Settings() {
   const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostic[]>([]);
   const [githubHydrationDisabled, setGithubHydrationDisabled] = useState(
     () => !!localStorage.getItem(GITHUB_HYDRATION_DISABLED_KEY)
+  );
+  const [saveLockDisabled, setSaveLockDisabled] = useState(
+    () => !!localStorage.getItem(SAVE_LOCK_DISABLED_KEY)
+  );
+  const [mergeProtectionDisabled, setMergeProtectionDisabled] = useState(
+    () => !!localStorage.getItem(MERGE_PROTECTION_DISABLED_KEY)
   );
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
@@ -845,6 +851,52 @@ export default function Settings() {
                   } else {
                     localStorage.removeItem(GITHUB_HYDRATION_DISABLED_KEY);
                     toast.info("GitHub hydration re-enabled — takes effect on next page load");
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 p-3 rounded-lg border border-muted bg-muted/20">
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium">Disable save lock</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  When ON, the <code>_isSaving</code> flag is never set. GitHub fetches can
+                  overwrite local saves (reverts to original behaviour). Use to confirm the
+                  lock is not blocking writes.
+                </p>
+              </div>
+              <Switch
+                checked={saveLockDisabled}
+                onCheckedChange={(v) => {
+                  setSaveLockDisabled(v);
+                  if (v) {
+                    localStorage.setItem(SAVE_LOCK_DISABLED_KEY, "1");
+                    toast.warning("Save lock disabled — GitHub responses may overwrite edits");
+                  } else {
+                    localStorage.removeItem(SAVE_LOCK_DISABLED_KEY);
+                    toast.info("Save lock re-enabled");
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-start justify-between gap-4 p-3 rounded-lg border border-muted bg-muted/20">
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium">Disable merge protection</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  When ON, smart merge is bypassed — GitHub data overwrites local data
+                  unconditionally on each page load. Use to confirm smart-merge logic is
+                  not hiding remote updates.
+                </p>
+              </div>
+              <Switch
+                checked={mergeProtectionDisabled}
+                onCheckedChange={(v) => {
+                  setMergeProtectionDisabled(v);
+                  if (v) {
+                    localStorage.setItem(MERGE_PROTECTION_DISABLED_KEY, "1");
+                    toast.warning("Merge protection disabled — GitHub data wins unconditionally");
+                  } else {
+                    localStorage.removeItem(MERGE_PROTECTION_DISABLED_KEY);
+                    toast.info("Merge protection re-enabled");
                   }
                 }}
               />

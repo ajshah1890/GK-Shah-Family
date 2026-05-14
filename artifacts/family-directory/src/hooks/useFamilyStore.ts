@@ -37,10 +37,24 @@ let _isSaving = false;
 let _isSavingTimer: ReturnType<typeof setTimeout> | null = null;
 let _localSaveTimestamp = 0;
 
+/** localStorage key — when set, the _isSaving lock is never acquired (debug aid). */
+export const SAVE_LOCK_DISABLED_KEY = 'gkshah_disable_save_lock';
+/** localStorage key — when set, smart merge is bypassed; remote data wins directly. */
+export const MERGE_PROTECTION_DISABLED_KEY = 'gkshah_disable_merge_protection';
+
 function setSaving(): void {
+  if (localStorage.getItem(SAVE_LOCK_DISABLED_KEY)) {
+    console.log('[GKShah] setSaving: save lock DISABLED by debug toggle — skipping');
+    return;
+  }
   _isSaving = true;
   if (_isSavingTimer) clearTimeout(_isSavingTimer);
-  _isSavingTimer = setTimeout(() => { _isSaving = false; }, 8000);
+  // 3 s is plenty — real GitHub fetches resolve in < 2 s. Shorter window = less
+  // risk of a stuck lock if something goes wrong.
+  _isSavingTimer = setTimeout(() => {
+    _isSaving = false;
+    console.log('[GKShah] setSaving: _isSaving auto-cleared after 3 s timeout');
+  }, 3000);
 }
 
 // ─── Smart merge ──────────────────────────────────────────────────────────────
@@ -290,6 +304,19 @@ export function useFamilyStore() {
               return;
             }
 
+            // Guard 3 — merge protection disabled: use remote data directly
+            if (localStorage.getItem(MERGE_PROTECTION_DISABLED_KEY)) {
+              logHydration(
+                `Members: merge protection disabled — using ${migrated.length} remote members directly`
+              );
+              if (!cancelled) {
+                setMembers(migrated);
+                save(migrated);
+                setIsLoaded(true);
+              }
+              return;
+            }
+
             // Smart merge: per-member updatedAt comparison replaces blind overwrite.
             // Local edits saved after the last GitHub sync always win.
             const { merged, localWins, remoteWins, localOnly, remoteOnly } =
@@ -402,137 +429,143 @@ export function useFamilyStore() {
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
   const addMember = (member: Omit<FamilyMember, 'id'>): { member: FamilyMember; error?: string } => {
-    const validationError = validateRelationship(
-      undefined, member.fatherId, member.motherId, member.spouseId
-    );
-    if (validationError) return { member: {} as FamilyMember, error: validationError };
-
-    // Mark saving BEFORE the write so any concurrent GitHub fetch response
-    // that resolves in the same tick will be blocked by the _isSaving guard.
-    setSaving();
-
-    const allById = new Map(members.map(m => [m.id, m]));
-    const id = crypto.randomUUID();
-
-    let lineageRootId = member.lineageRootId;
-    if (!lineageRootId) {
-      const parentId = member.fatherId || member.motherId;
-      lineageRootId = parentId
-        ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
-        : id;
-    }
-
-    let generationNumber = member.generationNumber;
-    if (!generationNumber) {
-      const parentId = member.fatherId || member.motherId;
-      const parent = parentId ? allById.get(parentId) : undefined;
-      if (parent?.generationNumber) generationNumber = parent.generationNumber + 1;
-    }
-
-    const memberId = member.memberId || nextMemberIdForGen(generationNumber, members);
-    const now = new Date().toISOString();
-
-    const newMember: FamilyMember = {
-      ...member,
-      id,
-      memberId,
-      lineageRootId,
-      generationNumber,
-      addedAt: now,
-      updatedAt: now,
-    };
-
-    console.group("[GKShah Save Trace] addMember");
-    console.log("PAYLOAD", {
-      id, fullName: member.fullName,
-      birthday: member.birthday, gender: member.gender,
-      bloodGroup: member.bloodGroup, generation: member.generation,
+    // console.group opened here so groupEnd in finally always pairs correctly.
+    console.group('[GKShah] addMember START');
+    console.log('[GKShah] addMember INPUT', {
+      fullName: member.fullName, birthday: member.birthday,
+      gender: member.gender, bloodGroup: member.bloodGroup, generation: member.generation,
     });
-
-    const next = rebuildChildrenArrays([...members, newMember]);
-    saveMembers(next);
-
-    console.log("STORE AFTER WRITE", { totalMembers: next.length, saved: next.find(m => m.id === id) });
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      const lsList: Array<{ id: string }> = Array.isArray(parsed) ? parsed : (parsed?.members ?? []);
-      console.log("LOCALSTORAGE AFTER WRITE", lsList.find(m => m.id === id) ?? "❌ NOT FOUND");
-    } catch { console.warn("[GKShah] Could not verify localStorage after addMember"); }
-    console.groupEnd();
+      const validationError = validateRelationship(
+        undefined, member.fatherId, member.motherId, member.spouseId
+      );
+      if (validationError) {
+        console.warn('[GKShah] addMember FAILURE (validation):', validationError);
+        return { member: {} as FamilyMember, error: validationError };
+      }
 
-    logAudit({
-      action: 'create',
-      memberId: id,
-      memberName: member.fullName,
-      timestamp: now,
-    });
+      // Mark saving BEFORE the write so any concurrent GitHub fetch response
+      // that resolves in the same tick will be blocked by the _isSaving guard.
+      setSaving();
+      console.log('[GKShah] addMember: _isSaving set, lock acquired');
 
-    return { member: next.find(m => m.id === id)! };
+      const allById = new Map(members.map(m => [m.id, m]));
+      const id = crypto.randomUUID();
+
+      let lineageRootId = member.lineageRootId;
+      if (!lineageRootId) {
+        const parentId = member.fatherId || member.motherId;
+        lineageRootId = parentId
+          ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
+          : id;
+      }
+
+      let generationNumber = member.generationNumber;
+      if (!generationNumber) {
+        const parentId = member.fatherId || member.motherId;
+        const parent = parentId ? allById.get(parentId) : undefined;
+        if (parent?.generationNumber) generationNumber = parent.generationNumber + 1;
+      }
+
+      const memberId = member.memberId || nextMemberIdForGen(generationNumber, members);
+      const now = new Date().toISOString();
+
+      const newMember: FamilyMember = {
+        ...member, id, memberId, lineageRootId, generationNumber, addedAt: now, updatedAt: now,
+      };
+
+      const next = rebuildChildrenArrays([...members, newMember]);
+      saveMembers(next);
+
+      // Best-effort localStorage verify
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        const lsList: Array<{ id: string }> = Array.isArray(parsed) ? parsed : (parsed?.members ?? []);
+        console.log('[GKShah] addMember LOCALSTORAGE VERIFY',
+          lsList.find(m => m.id === id) ? `✓ found (${id})` : `❌ NOT FOUND (${id})`);
+      } catch { /* noop */ }
+
+      logAudit({ action: 'create', memberId: id, memberName: member.fullName, timestamp: now });
+
+      const saved = next.find(m => m.id === id)!;
+      console.log('[GKShah] addMember END —', id, saved?.fullName);
+      return { member: saved };
+    } catch (err) {
+      console.error('[GKShah] addMember FAILURE (exception):', err);
+      throw err; // re-throw so performSave catch can show a toast
+    } finally {
+      console.groupEnd(); // always paired with the opening group
+    }
   };
 
   const updateMember = (id: string, updates: Partial<FamilyMember>): { error?: string } => {
     const validationError = validateRelationship(
       id, updates.fatherId, updates.motherId, updates.spouseId
     );
-    if (validationError) return { error: validationError };
-
-    // Mark saving BEFORE the write so any concurrent GitHub fetch response
-    // that resolves in the same tick will be blocked by the _isSaving guard.
-    setSaving();
-
-    const allById = new Map(members.map(m => [m.id, m]));
-    const existing = allById.get(id);
-    if (!existing) return { error: "Member not found" };
-
-    const updated = { ...existing, ...updates, id, updatedAt: new Date().toISOString() } as FamilyMember;
-
-    console.group("[GKShah Save Trace] updateMember");
-    console.log("PAYLOAD", {
-      id, fullName: updated.fullName,
-      birthday: updated.birthday, gender: updated.gender,
-      bloodGroup: updated.bloodGroup,
-      generation: updated.generation, generationNumber: updated.generationNumber,
+    // console.group opened here so groupEnd in finally always pairs correctly.
+    console.group('[GKShah] updateMember START');
+    console.log('[GKShah] updateMember INPUT', {
+      id, fullName: updates.fullName, birthday: updates.birthday,
+      gender: updates.gender, bloodGroup: updates.bloodGroup, generation: updates.generation,
     });
-    console.log("EXISTING before merge", {
-      birthday: existing.birthday, gender: existing.gender, bloodGroup: existing.bloodGroup,
-    });
-
-    const parentChanged =
-      updates.fatherId !== undefined || updates.motherId !== undefined;
-    if (parentChanged) {
-      const parentId = updated.fatherId || updated.motherId;
-      updated.lineageRootId = parentId
-        ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
-        : id;
-    }
-
-    const next = rebuildChildrenArrays(
-      members.map(m => m.id === id ? updated : m)
-    );
-    saveMembers(next);
-
-    console.log("STORE AFTER WRITE", { totalMembers: next.length, saved: next.find(m => m.id === id) });
     try {
-      const rawLs = localStorage.getItem(STORAGE_KEY);
-      const parsedLs = rawLs ? JSON.parse(rawLs) : null;
-      const lsList: Array<{ id: string }> = Array.isArray(parsedLs) ? parsedLs : (parsedLs?.members ?? []);
-      console.log("LOCALSTORAGE AFTER WRITE", lsList.find(m => m.id === id) ?? "❌ NOT FOUND");
-    } catch { console.warn("[GKShah] Could not verify localStorage after updateMember"); }
-    console.groupEnd();
+      if (validationError) {
+        console.warn('[GKShah] updateMember FAILURE (validation):', validationError);
+        return { error: validationError };
+      }
 
-    const changes = diffMembers(existing, updated);
-    if (Object.keys(changes).length > 0) {
-      logAudit({
-        action: 'update',
-        memberId: id,
-        memberName: updated.fullName,
-        timestamp: updated.updatedAt!,
-        changes,
+      // Mark saving BEFORE the write so any concurrent GitHub fetch response
+      // that resolves in the same tick will be blocked by the _isSaving guard.
+      setSaving();
+      console.log('[GKShah] updateMember: _isSaving set, lock acquired');
+
+      const allById = new Map(members.map(m => [m.id, m]));
+      const existing = allById.get(id);
+      if (!existing) {
+        console.warn('[GKShah] updateMember FAILURE: member not found:', id);
+        return { error: "Member not found" };
+      }
+
+      const updated = { ...existing, ...updates, id, updatedAt: new Date().toISOString() } as FamilyMember;
+      console.log('[GKShah] updateMember EXISTING vs UPDATED', {
+        existing: { birthday: existing.birthday, gender: existing.gender, bloodGroup: existing.bloodGroup },
+        updated:  { birthday: updated.birthday,  gender: updated.gender,  bloodGroup: updated.bloodGroup  },
       });
-    }
 
-    return {};
+      const parentChanged = updates.fatherId !== undefined || updates.motherId !== undefined;
+      if (parentChanged) {
+        const parentId = updated.fatherId || updated.motherId;
+        updated.lineageRootId = parentId
+          ? (resolveLineageRoot(allById.get(parentId), allById) ?? parentId)
+          : id;
+      }
+
+      const next = rebuildChildrenArrays(members.map(m => m.id === id ? updated : m));
+      saveMembers(next);
+
+      // Best-effort localStorage verify
+      try {
+        const rawLs = localStorage.getItem(STORAGE_KEY);
+        const parsedLs = rawLs ? JSON.parse(rawLs) : null;
+        const lsList: Array<{ id: string }> = Array.isArray(parsedLs) ? parsedLs : (parsedLs?.members ?? []);
+        console.log('[GKShah] updateMember LOCALSTORAGE VERIFY',
+          lsList.find(m => m.id === id) ? `✓ found (${id})` : `❌ NOT FOUND (${id})`);
+      } catch { /* noop */ }
+
+      const changes = diffMembers(existing, updated);
+      if (Object.keys(changes).length > 0) {
+        logAudit({ action: 'update', memberId: id, memberName: updated.fullName, timestamp: updated.updatedAt!, changes });
+      }
+
+      console.log('[GKShah] updateMember END —', id, updated.fullName);
+      return {};
+    } catch (err) {
+      console.error('[GKShah] updateMember FAILURE (exception):', err);
+      throw err; // re-throw so performSave catch can show a toast
+    } finally {
+      console.groupEnd(); // always paired with the opening group
+    }
   };
 
   const deleteMember = (id: string) => {
@@ -589,7 +622,19 @@ export function useFamilyStore() {
   };
 
   const importMembers = (importedMembers: FamilyMember[]) => {
-    saveMembers(migrateMembers(importedMembers as any[]));
+    console.group('[GKShah] importMembers START');
+    console.log('[GKShah] importMembers INPUT count:', importedMembers.length);
+    try {
+      setSaving(); // block GitHub hydration from overwriting mid-import
+      console.log('[GKShah] importMembers: _isSaving set, lock acquired');
+      saveMembers(migrateMembers(importedMembers as any[]));
+      console.log('[GKShah] importMembers END — saved', importedMembers.length, 'member(s)');
+    } catch (err) {
+      console.error('[GKShah] importMembers FAILURE (exception):', err);
+      throw err;
+    } finally {
+      console.groupEnd();
+    }
   };
 
   // ── Merge ───────────────────────────────────────────────────────────────────

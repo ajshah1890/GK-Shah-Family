@@ -20,7 +20,7 @@ import {
 import {
   FileSpreadsheet, Upload, Download, ArrowRight, CheckCircle2,
   AlertTriangle, AlertCircle, Info, ChevronLeft, RefreshCw,
-  Users, Link2, LinkIcon, SkipForward, Copy, CircleX,
+  Users, Link2, LinkIcon, SkipForward, Copy, CircleX, GitFork,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FamilyMember } from "@/types/family";
@@ -65,6 +65,7 @@ function warnMeta(type: WarnType): WarnMeta {
     case "missing_mother": return { icon: <AlertTriangle className="w-3.5 h-3.5" />, color: "text-orange-600 dark:text-orange-400", label: "Missing mother" };
     case "unresolved_spouse": return { icon: <AlertCircle className="w-3.5 h-3.5" />, color: "text-yellow-600 dark:text-yellow-400", label: "Unresolved spouse" };
     case "orphan": return { icon: <Info className="w-3.5 h-3.5" />, color: "text-muted-foreground", label: "Isolated member" };
+    case "self_reference": return { icon: <CircleX className="w-3.5 h-3.5" />, color: "text-destructive", label: "Self-reference" };
   }
 }
 
@@ -83,6 +84,7 @@ export default function Import() {
   const [fileName, setFileName] = useState("");
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update">("skip");
   const [replaceAll, setReplaceAll] = useState(false);
+  const [recomputeGenerations, setRecomputeGenerations] = useState(false);
   const [analysis, setAnalysis] = useState<ImportResult | null>(null);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -157,7 +159,7 @@ export default function Import() {
     setIsAnalysing(true);
     setTimeout(() => {
       try {
-        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: true };
+        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: true, recomputeGenerations };
         const result = runImport(rows, headers, mapping, members, opts);
         setAnalysis(result);
         setStep("preview");
@@ -175,7 +177,7 @@ export default function Import() {
     setIsImporting(true);
     setTimeout(() => {
       try {
-        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: false };
+        const opts: ImportOptions = { duplicateMode, replaceAll, dryRun: false, recomputeGenerations };
         const result = runImport(rows, headers, mapping, members, opts);
 
         importMembers(result.members);
@@ -183,12 +185,13 @@ export default function Import() {
         // Record fingerprint to detect duplicate imports next time
         localStorage.setItem(DUPE_IMPORT_KEY, `${fileName}::${rows.length}`);
 
-        const { newMembers, updatedMembers, skippedMembers, relationshipsResolved } = result.stats;
+        const { newMembers, updatedMembers, skippedMembers, resolvedByID, resolvedByName } = result.stats;
         const parts: string[] = [];
         if (newMembers > 0) parts.push(`${newMembers} added`);
         if (updatedMembers > 0) parts.push(`${updatedMembers} updated`);
         if (skippedMembers > 0) parts.push(`${skippedMembers} skipped`);
-        if (relationshipsResolved > 0) parts.push(`${relationshipsResolved} relationships linked`);
+        const totalLinked = resolvedByID + resolvedByName;
+        if (totalLinked > 0) parts.push(`${totalLinked} relationships linked`);
         toast.success(`Import complete: ${parts.join(", ") || "nothing changed"}`);
 
         cancelImport();
@@ -439,7 +442,7 @@ export default function Import() {
             </div>
 
             {/* Options */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Duplicate handling</p>
                 <div className="flex rounded-lg border border-border overflow-hidden text-xs">
@@ -485,6 +488,24 @@ export default function Import() {
                   </p>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Generation numbers</p>
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors">
+                  <Checkbox
+                    checked={recomputeGenerations}
+                    onCheckedChange={(v) => setRecomputeGenerations(Boolean(v))}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm font-medium leading-tight">Recompute generation numbers</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Overwrite Excel generation values by recomputing from the tree structure.
+                      Leave unchecked to preserve imported values.
+                    </p>
+                  </div>
+                </label>
+              </div>
             </div>
           </CardContent>
 
@@ -522,24 +543,60 @@ export default function Import() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Row counts */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard icon={<Users className="w-4 h-4" />} label="Total rows" value={analysis.stats.totalRows} />
                 <StatCard icon={<CheckCircle2 className="w-4 h-4 text-green-600" />} label="Valid rows" value={analysis.stats.validRows} color="green" />
                 <StatCard icon={<Copy className="w-4 h-4 text-yellow-600" />} label="Dupes in file" value={analysis.stats.duplicatesInFile} color={analysis.stats.duplicatesInFile > 0 ? "yellow" : undefined} />
-                <StatCard icon={<Link2 className="w-4 h-4 text-blue-600" />} label="Relationships resolved" value={analysis.stats.relationshipsResolved} color="blue" />
+                <StatCard icon={<Info className="w-4 h-4 text-muted-foreground" />} label="Isolated nodes" value={analysis.stats.isolatedNodes} color={analysis.stats.isolatedNodes > 0 ? "yellow" : undefined} />
               </div>
 
+              {/* Import action counts */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                 <StatCard icon={<CheckCircle2 className="w-4 h-4 text-green-600" />} label="Will be added" value={analysis.stats.newMembers} color="green" />
                 <StatCard icon={<RefreshCw className="w-4 h-4 text-blue-600" />} label="Will be updated" value={analysis.stats.updatedMembers} color="blue" />
                 <StatCard icon={<SkipForward className="w-4 h-4 text-muted-foreground" />} label="Will be skipped" value={analysis.stats.skippedMembers} />
               </div>
 
-              {analysis.stats.relationshipsUnresolved > 0 && (
-                <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-sm">
-                  <LinkIcon className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+              {/* Relationship resolution breakdown */}
+              <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/40 border-b border-border">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Relationship Resolution</p>
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-border">
+                  <div className="flex flex-col items-center gap-0.5 py-3 px-2">
+                    <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1">
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide">By ID</span>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums text-blue-700 dark:text-blue-400">{analysis.stats.resolvedByID}</p>
+                    <p className="text-[10px] text-muted-foreground">Excel / store IDs</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 py-3 px-2">
+                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 mb-1">
+                      <GitFork className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide">By Name</span>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{analysis.stats.resolvedByName}</p>
+                    <p className="text-[10px] text-muted-foreground">fuzzy name fallback</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 py-3 px-2">
+                    <div className={`flex items-center gap-1.5 mb-1 ${analysis.stats.unresolvedCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide">Unresolved</span>
+                    </div>
+                    <p className={`text-2xl font-bold tabular-nums ${analysis.stats.unresolvedCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>{analysis.stats.unresolvedCount}</p>
+                    <p className="text-[10px] text-muted-foreground">not found anywhere</p>
+                  </div>
+                </div>
+              </div>
+
+              {analysis.stats.unresolvedCount > 0 && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
                   <p className="text-orange-800 dark:text-orange-200">
-                    <strong>{analysis.stats.relationshipsUnresolved}</strong> relationship{analysis.stats.relationshipsUnresolved !== 1 ? "s" : ""} could not be resolved — parent/spouse names not found.
+                    <strong>{analysis.stats.unresolvedCount}</strong> relationship{analysis.stats.unresolvedCount !== 1 ? "s" : ""} could not be resolved.
+                    Check that Father ID / Mother ID / Spouse ID values exist in this file or the current directory.
                   </p>
                 </div>
               )}
@@ -597,6 +654,11 @@ export default function Import() {
             <Badge variant="outline" className="gap-1.5">
               Duplicates: {duplicateMode === "skip" ? "Skip" : "Overwrite"}
             </Badge>
+            {recomputeGenerations && (
+              <Badge variant="outline" className="gap-1.5 border-blue-400 text-blue-700 dark:text-blue-300">
+                <RefreshCw className="w-3 h-3" /> Recomputing generations
+              </Badge>
+            )}
             {replaceAll && (
               <Badge variant="destructive" className="gap-1.5">
                 <AlertTriangle className="w-3 h-3" /> Replace all existing data

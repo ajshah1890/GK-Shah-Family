@@ -6,8 +6,7 @@
  *  - syncToGitHub(type, data) → POST JSON through the API proxy (admin secret sent server-side)
  *  - testGitHubConnection()  → verifies token, repo reachability, and write access
  *
- * The frontend never touches the GitHub token or ADMIN_SECRET directly.
- * It sends X-Admin-Secret (the app admin password) to the API proxy which
+ * The frontend sends X-Admin-Secret (VITE_ADMIN_SECRET) to the API proxy which
  * validates it against the real ADMIN_SECRET env var server-side.
  *
  * All response.json() calls are wrapped in safe parsing — never throws on
@@ -43,13 +42,6 @@ export interface SyncDiagnostic {
 
 const API_BASE = "/api/data";
 
-function getAdminPassword(): string {
-  try {
-    return localStorage.getItem("gkshah_admin_password") ?? "gkshah2024";
-  } catch {
-    return "gkshah2024";
-  }
-}
 
 /**
  * Safely reads a Response body and parses JSON.
@@ -179,12 +171,12 @@ export async function syncToGitHub<T>(
   const method = "POST";
   const t0 = Date.now();
   try {
-    const adminPassword = getAdminPassword();
+    console.log("Sending admin secret:", import.meta.env.VITE_ADMIN_SECRET);
     const res = await fetch(endpoint, {
       method,
       headers: {
         "Content-Type": "application/json",
-        "X-Admin-Secret": adminPassword,
+        "X-Admin-Secret": import.meta.env.VITE_ADMIN_SECRET,
       },
       body: JSON.stringify(data),
     });
@@ -290,12 +282,12 @@ export async function testGitHubConnection(): Promise<ConnectionTestResult> {
       return { ok: false, tokenPresent: false, repoReachable: res.status !== 502, writeAccess: false, latencyMs, httpStatus, error: msg };
     }
 
-    const adminPassword = getAdminPassword();
+    console.log("Sending admin secret:", import.meta.env.VITE_ADMIN_SECRET);
     const writeRes = await fetch(`${API_BASE}/settings`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Admin-Secret": adminPassword,
+        "X-Admin-Secret": import.meta.env.VITE_ADMIN_SECRET,
       },
       body: JSON.stringify({ _connectionTest: true, _savedAt: new Date().toISOString() }),
     });

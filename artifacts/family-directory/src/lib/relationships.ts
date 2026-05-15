@@ -127,31 +127,33 @@ function greats(n: number): string {
 }
 
 /**
- * Returns a human-readable kinship label from A's perspective.
+ * Returns a human-readable kinship label for the phrase "A is B's [label]".
  * dA = steps from A up to the common ancestor
  * dB = steps from B up to the common ancestor
- * genderB = gender of B (to pick he/she pronouns in the label)
+ * genderA = gender of A (the subject being described — determines Father vs Mother, Son vs Daughter, etc.)
  */
 export function kinshipLabel(
   dA: number,
   dB: number,
-  genderB: string | undefined
+  genderA: string | undefined
 ): string {
-  const isMale = genderB === "Male";
-  const isFemale = genderB === "Female";
+  const isMale = genderA === "Male";
+  const isFemale = genderA === "Female";
 
-  // B is a descendant of A (A is the common ancestor)
+  // A is a direct ancestor of B (A IS the common ancestor, dA = 0)
+  // → "A is B's Father / Grandfather / Great-Grandfather …"
   if (dA === 0) {
-    if (dB === 1) return isFemale ? "Daughter" : "Son";
-    if (dB === 2) return isFemale ? "Granddaughter" : "Grandson";
-    return `${greats(dB - 2)}Grand${isFemale ? "daughter" : "son"}`;
+    if (dB === 1) return isFemale ? "Mother" : "Father";
+    if (dB === 2) return isFemale ? "Grandmother" : "Grandfather";
+    return `${greats(dB - 2)}Grand${isFemale ? "mother" : "father"}`;
   }
 
-  // A is a descendant of B (B is the common ancestor)
+  // B is a direct ancestor of A (B IS the common ancestor, dB = 0)
+  // → "A is B's Son / Grandson / Great-Grandson …"
   if (dB === 0) {
-    if (dA === 1) return isFemale ? "Mother" : "Father";
-    if (dA === 2) return isFemale ? "Grandmother" : "Grandfather";
-    return `${greats(dA - 2)}Grand${isFemale ? "mother" : "father"}`;
+    if (dA === 1) return isFemale ? "Daughter" : "Son";
+    if (dA === 2) return isFemale ? "Granddaughter" : "Grandson";
+    return `${greats(dA - 2)}Grand${isFemale ? "daughter" : "son"}`;
   }
 
   // Siblings
@@ -208,8 +210,8 @@ export function calculateRelationship(
   const path = findRelationshipPath(memberA.id, memberB.id, members);
   if (!path) return null;
 
-  const label = kinshipLabel(ca.depthA, ca.depthB, memberB.gender);
-  const reversedLabel = kinshipLabel(ca.depthB, ca.depthA, memberA.gender);
+  const label = kinshipLabel(ca.depthA, ca.depthB, memberA.gender);
+  const reversedLabel = kinshipLabel(ca.depthB, ca.depthA, memberB.gender);
 
   const ancestorNote =
     ca.depthA === 0 ? "" :

@@ -1,0 +1,131 @@
+STOP patching hydration/events/guards.
+
+The current architecture is fundamentally unstable because useFamilyStore/useMomentsStore are using isolated React useState instances instead of a true shared global store.
+
+This causes:
+
+* stale component copies
+* inconsistent renders
+* event synchronization hacks
+* hydration races
+* impossible debugging
+
+We need a proper centralized Zustand store architecture.
+
+====================================
+GOAL
+====
+
+Refactor:
+
+* useFamilyStore
+* useMomentsStore
+
+into true singleton Zustand stores.
+
+There must be:
+ONE global source of truth.
+
+No custom DOM event syncing.
+No duplicated component-local copies.
+
+====================================
+TASK 1 — CREATE REAL ZUSTAND STORE
+==================================
+
+Use:
+create()
+persist()
+
+Pattern:
+const useFamilyStore = create<FamilyState>()(
+persist(...)
+)
+
+State:
+
+* members
+* hydration flags
+* sync flags
+* timestamps
+
+Actions:
+
+* addMember
+* updateMember
+* importMembers
+* removeMember
+* sync
+* hydrate
+
+====================================
+TASK 2 — REMOVE LOCAL useState COPIES
+=====================================
+
+Delete:
+
+* component-local members state
+* manual event dispatch
+* gkshah:members-changed
+* sync listeners
+
+Components must subscribe directly to Zustand state.
+
+====================================
+TASK 3 — ENSURE IMMUTABLE UPDATES
+=================================
+
+Every update must create:
+new arrays
+new objects
+
+Never mutate existing references.
+
+====================================
+TASK 4 — SINGLE HYDRATION PIPELINE
+==================================
+
+Hydration should happen:
+ONCE globally
+
+NOT per component mount.
+
+====================================
+TASK 5 — REACTIVITY TEST
+========================
+
+Verify:
+
+* add member updates instantly everywhere
+* import updates instantly everywhere
+* edit updates instantly everywhere
+* moments update instantly everywhere
+
+WITHOUT page reloads.
+
+====================================
+TASK 6 — KEEP EXISTING FEATURES
+===============================
+
+Preserve:
+
+* sync logic
+* smart merge
+* timestamps
+* import engine
+* family tree
+
+Only refactor state architecture.
+
+====================================
+IMPORTANT
+=========
+
+This is NOT a UI issue anymore.
+This is NOT a field issue anymore.
+
+The root problem is:
+isolated hook state pretending to be a shared store.
+
+Goal:
+Convert app into a true centralized reactive state system.

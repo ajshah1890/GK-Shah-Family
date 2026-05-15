@@ -372,6 +372,26 @@ export default function Import() {
               </div>
             )}
 
+            {/* Relationship ID guidance */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
+              <Link2 className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium text-blue-900 dark:text-blue-200">
+                  Map relationship ID columns for accurate family tree linking
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  For the most accurate relationships, map these columns if your file has them:
+                  <span className="font-semibold"> Member ID</span> (unique per person),
+                  <span className="font-semibold"> Father ID</span>,
+                  <span className="font-semibold"> Mother ID</span>, and
+                  <span className="font-semibold"> Spouse ID</span>.
+                  These override name-based fuzzy matching.
+                  Use <span className="font-semibold">Father Name / Mother Name</span> as fallback only.
+                  Preferred date format: <span className="font-mono font-semibold">YYYY-MM-DD</span> (e.g. 2000-09-18).
+                </p>
+              </div>
+            </div>
+
             {/* Mapping grid */}
             <div className="bg-muted/30 p-4 rounded-lg border border-border">
               <h4 className="font-medium mb-4 flex items-center gap-2 text-sm">

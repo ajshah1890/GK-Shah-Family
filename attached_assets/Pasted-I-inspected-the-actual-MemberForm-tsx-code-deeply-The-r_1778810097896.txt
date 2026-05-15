@@ -1,0 +1,109 @@
+I inspected the actual MemberForm.tsx code deeply.
+
+The remaining persistence issue is NOT GitHub sync anymore.
+It is NOT Zustand anymore.
+It is NOT storage anymore.
+
+The problem is specifically with ShadCN Select hydration and RHF controlled state.
+
+Symptoms:
+
+* birthday/anniversary now persist correctly
+* but gender/generation/bloodGroup still reopen blank or require reattempt
+* analytics still shows values exist
+* therefore persistence works
+* form hydration into Select UI is failing
+
+Root cause:
+Some Select components are still using uncontrolled/defaultValue behavior instead of fully controlled value binding.
+
+TASK:
+
+Inspect ALL Select components in MemberForm.tsx:
+
+* gender
+* generation
+* bloodGroup
+
+Find any usage like:
+
+<Select
+onValueChange={field.onChange}
+defaultValue={field.value}
+
+>
+
+Replace with STRICT controlled mode:
+
+<Select
+value={field.value || ""}
+onValueChange={field.onChange}
+
+>
+
+IMPORTANT:
+Do NOT use defaultValue anywhere in RHF-controlled Selects.
+
+Also:
+Do NOT use empty-string SelectItem values.
+
+WRONG: <SelectItem value="">None</SelectItem>
+
+CORRECT: <SelectItem value="none">None</SelectItem>
+
+Then normalize in save logic if needed.
+
+Add temporary debug logs:
+
+Before form.reset():
+console.log("[GKShah] RESET VALUES", {
+gender: member.gender,
+generation: member.generation,
+bloodGroup: member.bloodGroup,
+});
+
+Inside each Select render:
+console.log("Gender Select value", field.value);
+
+Verify:
+
+1. edit member
+2. save gender/generation/bloodGroup
+3. reopen member
+4. values persist visually AND in payload
+
+========================
+SECOND ISSUE
+============
+
+Longest lineage chain is still wrong because imported parent-child graph is partially disconnected.
+
+The lineage engine correctly depends on fatherId/motherId relationships.
+
+Verify after import that:
+
+* fatherId
+* motherId
+* spouseId
+
+are actually populated on imported members.
+
+Do NOT rely only on fatherName/motherName strings.
+
+Ensure import mapping UI strongly encourages:
+
+* memberId
+* fatherId
+* motherId
+* spouseId
+
+Preferred Excel date format:
+YYYY-MM-DD
+
+Example:
+2000-09-18
+
+Also verify rebuildChildrenArrays() runs after every import/update.
+
+Goal:
+Completely stabilize edit-form hydration and lineage graph consistency.

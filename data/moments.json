@@ -1,3 +1,17 @@
 {
-  "_savedAt": "2026-05-15T00:38:14.211Z"
+  "0": {
+    "id": "moment_1778805530962_237jj4h",
+    "caption": "First Website",
+    "photoKeys": [
+      "moment_1778805530962_237jj4h_photo_0"
+    ],
+    "taggedMemberIds": [],
+    "eventDate": "2026-05-15",
+    "eventType": "Other",
+    "favorite": false,
+    "archived": false,
+    "createdAt": "2026-05-15T00:38:50.962Z",
+    "updatedAt": "2026-05-15T00:38:50.962Z"
+  },
+  "_savedAt": "2026-05-15T00:38:57.645Z"
 }

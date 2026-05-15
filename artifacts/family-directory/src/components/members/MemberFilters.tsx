@@ -20,12 +20,13 @@ import {
 interface MemberFiltersProps {
   members: FamilyMember[];
   onFilterChange: (filteredMembers: FamilyMember[]) => void;
+  initialCity?: string;
 }
 
-export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
+export function MemberFilters({ members, onFilterChange, initialCity }: MemberFiltersProps) {
   const [search, setSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [cityFilter, setCityFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState(initialCity && initialCity !== "" ? initialCity : "all");
   const [countryFilter, setCountryFilter] = useState("all");
   const [professionFilter, setProfessionFilter] = useState("all");
   const [mainBranchFilter, setMainBranchFilter] = useState("all");
@@ -58,13 +59,23 @@ export function MemberFilters({ members, onFilterChange }: MemberFiltersProps) {
       result = result.filter(m =>
         m.fullName.toLowerCase().includes(q) ||
         (m.city && m.city.toLowerCase().includes(q)) ||
+        (m.country && m.country.toLowerCase().includes(q)) ||
         (m.profession && m.profession.toLowerCase().includes(q)) ||
         (m.company && m.company.toLowerCase().includes(q)) ||
+        (m.previousCompany && m.previousCompany.toLowerCase().includes(q)) ||
+        (m.businessName && m.businessName.toLowerCase().includes(q)) ||
         (m.mainFamilyBranch && m.mainFamilyBranch.toLowerCase().includes(q)) ||
         (m.subFamilyBranch && m.subFamilyBranch.toLowerCase().includes(q)) ||
         (m.generation && m.generation.toLowerCase().includes(q)) ||
         (m.gender && m.gender.toLowerCase().includes(q)) ||
-        (m.nativePlace && m.nativePlace.toLowerCase().includes(q))
+        (m.nativePlace && m.nativePlace.toLowerCase().includes(q)) ||
+        (m.education && m.education.toLowerCase().includes(q)) ||
+        (m.bloodGroup && m.bloodGroup.toLowerCase().includes(q)) ||
+        (m.email && m.email.toLowerCase().includes(q)) ||
+        (m.phone && m.phone.includes(q)) ||
+        (m.whatsapp && m.whatsapp.includes(q)) ||
+        (m.spouseName && m.spouseName.toLowerCase().includes(q)) ||
+        (m.memberId && m.memberId.toLowerCase().includes(q))
       );
     }
 

@@ -21,6 +21,7 @@ import MomentForm from "@/pages/MomentForm";
 import MomentDetail from "@/pages/MomentDetail";
 import NotFound from "@/pages/not-found";
 import DebugStorage from "@/pages/DebugStorage";
+import About from "@/pages/About";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function Router() {
           <Route path="/moments/new" component={MomentForm} />
           <Route path="/moments/:id" component={MomentDetail} />
           <Route path="/debug-storage" component={DebugStorage} />
+          <Route path="/about" component={About} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

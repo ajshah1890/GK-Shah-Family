@@ -33,6 +33,53 @@ function str(v: unknown): string {
   return String(v ?? "").trim();
 }
 
+/**
+ * Normalize date values from Excel imports to YYYY-MM-DD strings.
+ * Handles:
+ *   - JS Date objects (xlsx can return these when cellDates: true)
+ *   - Excel serial numbers (integer days since 1899-12-30)
+ *   - ISO strings (pass through the date portion)
+ *   - DD/MM/YYYY and MM/DD/YYYY slash/dash formats
+ */
+function normalizeExcelDate(val: unknown): string {
+  if (val === undefined || val === null || val === "") return "";
+
+  // JS Date object
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    return val.toISOString().slice(0, 10);
+  }
+
+  // Excel serial number — days since 1899-12-30 (Lotus bug era)
+  if (typeof val === "number") {
+    if (val <= 0 || val > 2958465) return ""; // outside 1900–9999
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const ms = excelEpoch.getTime() + val * 86_400_000;
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  }
+
+  const s = String(val).trim();
+  if (!s) return "";
+
+  // Already YYYY-MM-DD (possibly with time)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+  // DD/MM/YYYY or DD-MM-YYYY (most common Indian format)
+  const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // Native parse as last resort
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+
+  return s; // return as-is if we can't parse it
+}
+
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export type WarnType =
@@ -158,6 +205,9 @@ export function runImport(
       } else if (field === "generationNumber" || field === "siblingOrder") {
         const n = Number(val);
         if (!isNaN(n) && n > 0) raw[field] = n;
+      } else if (field === "birthday" || field === "anniversary") {
+        const d = normalizeExcelDate(val);
+        if (d) raw[field] = d;
       } else {
         raw[field] = str(val).replace(/\s+/g, " ");
       }

@@ -236,21 +236,53 @@ export interface GenealogyInsights {
 export function computeGenealogyInsights(members: FamilyMember[]): GenealogyInsights {
   const memberMap = new Map(members.map(m => [m.id, m]));
 
-  // Longest lineage chain — find deepest leaf, trace back to root
-  const maxGen = Math.max(1, ...members.map(m => m.generationNumber ?? 1));
-  const deepestLeaf = members
-    .filter(m => (m.generationNumber ?? 1) === maxGen)
-    .sort((a, b) => a.fullName.localeCompare(b.fullName))[0];
+  // Longest lineage chain — DFS from every root (no parents) downward via childrenIds.
+  // This is more accurate than tracing from deepest-leaf-by-generationNumber because
+  // generationNumber can be unset or incorrect for some members.
+  let longestChainMembers: FamilyMember[] = [];
 
-  const longestChainMembers: FamilyMember[] = [];
-  if (deepestLeaf) {
-    const visited = new Set<string>();
-    let cur: FamilyMember | undefined = deepestLeaf;
-    while (cur && !visited.has(cur.id)) {
-      longestChainMembers.unshift(cur);
-      visited.add(cur.id);
-      const parentId: string | undefined = cur.fatherId || cur.motherId;
-      cur = parentId ? memberMap.get(parentId) : undefined;
+  function dfsLongest(member: FamilyMember, path: FamilyMember[], visited: Set<string>) {
+    if (visited.has(member.id)) return;
+    visited.add(member.id);
+    path.push(member);
+
+    const children = (member.childrenIds ?? [])
+      .map(cid => memberMap.get(cid))
+      .filter((m): m is FamilyMember => !!m && !visited.has(m.id));
+
+    if (children.length === 0) {
+      if (path.length > longestChainMembers.length) longestChainMembers = [...path];
+    } else {
+      for (const child of children) {
+        dfsLongest(child, path, visited);
+      }
+    }
+
+    path.pop();
+    visited.delete(member.id);
+  }
+
+  const roots = members.filter(m => !m.fatherId && !m.motherId);
+  for (const root of roots) {
+    dfsLongest(root, [], new Set());
+  }
+
+  // Fallback: if no roots found (e.g. all members have a parent — circular or incomplete data),
+  // fall back to the old generationNumber-based approach.
+  if (longestChainMembers.length === 0 && members.length > 0) {
+    const maxGen = Math.max(1, ...members.map(m => m.generationNumber ?? 1));
+    const deepestLeaf = members
+      .filter(m => (m.generationNumber ?? 1) === maxGen)
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))[0];
+    if (deepestLeaf) {
+      const visited = new Set<string>();
+      let cur: FamilyMember | undefined = deepestLeaf;
+      while (cur && !visited.has(cur.id)) {
+        longestChainMembers.unshift(cur);
+        visited.add(cur.id);
+        const parentId: string | undefined = cur.fatherId || cur.motherId;
+        cur = parentId ? memberMap.get(parentId) : undefined;
+      }
     }
   }
 

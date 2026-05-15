@@ -94,7 +94,7 @@ export default function MemberForm() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const isHydrating = useRef(false);
-  const hydrated = useRef(false);
+  const hydratedForId = useRef<string | null>(null);
 
   /** Snapshot of the DB values when edit form opened — used as fallback on save. */
   const originalValues = useRef<{
@@ -157,11 +157,13 @@ export default function MemberForm() {
   useEffect(() => {
     // Only hydrate once per member id — prevents re-hydration wiping user edits
     // whenever the members array reference changes (e.g. GitHub sync, other saves).
-    if (!isLoaded || !isEditing || hydrated.current) return;
+    if (!isLoaded || !isEditing || hydratedForId.current === id) return;
     const member = members.find(m => m.id === id);
     if (!member) return;
 
-    hydrated.current = true;
+    // Clear explicit-clear tracking for the incoming member before resetting
+    userExplicitlyClearedRels.current = new Set();
+    hydratedForId.current = id;
 
     // Snapshot DB values; used as fallback in buildMemberData if a field silently fails to hydrate.
     // Normalize dates to YYYY-MM-DD so the snapshot matches the form's date input format.
@@ -239,12 +241,14 @@ export default function MemberForm() {
     }
   }, [isLoaded, isEditing, id, members]); // `members` needed for find(); hydrated.current prevents re-runs
 
-  // When navigating to a different member, reset the one-time hydration guard
-  // and clear the explicit-clear tracking so the new member starts fresh.
+  // When navigating to /members/new, clear the photo preview so it doesn't
+  // persist from a previous edit session.
   useEffect(() => {
-    hydrated.current = false;
-    userExplicitlyClearedRels.current = new Set();
-  }, [id]);
+    if (!isEditing) {
+      setPhotoPreview(null);
+      hydratedForId.current = null;
+    }
+  }, [isEditing]);
 
   // Watch all five hydration-sensitive fields for the debug panel + generation effect
   const fatherId      = form.watch("fatherId");

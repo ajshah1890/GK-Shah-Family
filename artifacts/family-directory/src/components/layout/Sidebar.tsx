@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, Settings, Network, FileSpreadsheet,
-  Lock, GitMerge, BarChart2, Shield, Search, Camera, Database,
+  Lock, GitMerge, BarChart2, Shield, Search, Camera, Database, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -19,6 +19,7 @@ const navItems = [
   { name: "Relationships", href: "/relationships",  icon: GitMerge },
   { name: "Statistics",    href: "/statistics",     icon: BarChart2 },
   { name: "Import",        href: "/import",         icon: FileSpreadsheet },
+  { name: "About",         href: "/about",          icon: Info },
   { name: "Settings",      href: "/settings",       icon: Settings },
 ];
 

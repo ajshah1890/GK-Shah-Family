@@ -1,0 +1,325 @@
+The app is now stable overall and sync is working, but several UX, analytics, hydration, and import issues remain. Do ONE comprehensive implementation pass and verify everything end-to-end before committing.
+
+========================
+CRITICAL BUG FIXES
+==================
+
+1. Edit form hydration issue (MOST IMPORTANT)
+   Problem:
+   birthday and anniversary are now saving correctly.
+   However:
+
+* gender
+* generation
+* bloodGroup
+
+still disappear/revert on every edit reopen.
+
+Symptoms:
+
+* values exist in analytics/store
+* relationship engine can use gender
+* generation charts are populated
+* but reopening edit form shows:
+  "Select Gender"
+  "Select Generation"
+
+This confirms:
+
+* persistence layer works
+* hydration into Select components is broken
+
+Likely root cause:
+ShadCN Select components are still partially uncontrolled.
+
+Inspect all RHF Controller + Select integrations.
+
+Every Select must use CONTROLLED mode:
+
+WRONG:
+defaultValue={field.value}
+
+CORRECT:
+value={field.value || ""}
+onValueChange={field.onChange}
+
+Verify for:
+
+* gender
+* bloodGroup
+* generation
+
+Also ensure form.reset() correctly propagates to Select state after hydration.
+
+Deeply inspect:
+
+* MemberForm.tsx
+* Select wrappers
+* RHF Controller usage
+* form.reset flow
+
+Verify by:
+
+1. edit member
+2. set gender/generation/bloodGroup
+3. save
+4. reopen
+5. values must persist correctly every time
+
+Do NOT patch superficially.
+Trace the full hydration lifecycle.
+
+========================
+IMPORT FIXES
+============
+
+2. Excel import date parsing issue
+
+Currently birthdays/anniversaries from Excel are not reliably imported.
+
+Make importer robust.
+
+Support ALL formats:
+
+* YYYY-MM-DD
+* DD/MM/YYYY
+* MM/DD/YYYY
+* Excel serial dates
+* ISO strings
+
+Normalize internally to:
+YYYY-MM-DD
+
+Add import diagnostics:
+
+* rows imported
+* rows skipped
+* invalid dates count
+
+If date invalid:
+show warning instead of silently dropping.
+
+Document accepted Excel formats in the UI near import button.
+
+Preferred export/import format:
+YYYY-MM-DD
+
+========================
+ANALYTICS FIXES
+===============
+
+3. Longest lineage chain calculation is wrong
+
+Current broken output:
+"Longest Lineage Chain (1 generations)"
+Root = same as deepest
+
+This is incorrect.
+
+The relationship explorer now works correctly, so lineage analytics must reuse the SAME ancestry graph utilities.
+
+Implement proper DFS/BFS recursive lineage depth traversal.
+
+Expected behavior:
+find the deepest descendant chain across the family tree.
+
+Do NOT use shallow child count logic.
+
+Likely issue:
+current implementation only checks one level or self-reference.
+
+========================
+REMOVE BLOOD GROUP ANALYTICS
+============================
+
+4. Remove Blood Group statistics card entirely
+
+Remove:
+
+* chart
+* aggregation
+* dashboard widget
+
+Keep bloodGroup as member data field only.
+
+========================
+CITY CLICK INTERACTION
+======================
+
+5. Top Cities chart should be interactive
+
+When user clicks:
+"Mumbai"
+
+navigate to:
+Members page filtered by city=Mumbai
+
+Equivalent to searching Mumbai manually.
+
+Implementation options:
+
+* query param
+* shared filter state
+* router navigation
+
+Desired result:
+all Mumbai members visible immediately.
+
+========================
+SMART SEARCH
+============
+
+6. Implement Smart Search
+
+Current search is too basic.
+
+Search across:
+
+* name
+* city
+* education
+* profession
+* company
+* blood group
+* generation
+* branch
+* native place
+
+Examples:
+"CA Mumbai"
+"O+"
+"IIM"
+"Engineer Ahmedabad"
+"4th generation"
+
+Implement fuzzy matching and multi-field token search.
+
+Search should work globally across:
+
+* Members page
+* Command palette
+* Dashboard quick search
+
+IMPORTANT:
+Education field currently is NOT searchable.
+Fix this explicitly.
+
+========================
+FAMILY STATISTICS PAGE
+======================
+
+7. Add advanced Family Statistics page
+
+Include:
+
+* total members
+* members per generation
+* city distribution
+* branch distribution
+* oldest member
+* youngest member
+* average age
+* most common surnames
+* longest lineage chain
+* members added this month
+* marriages by decade
+* migration insights
+
+Charts should be responsive and clean.
+
+========================
+ABOUT GK SHAH PAGE
+==================
+
+8. Create dedicated "About GK Shah Family" page
+
+Sections:
+
+* family origin/history
+* founder/ancestor
+* branch evolution
+* migration journey
+* family values
+* timeline
+* old photos
+* custom text editable by admin
+
+Include:
+
+* elegant typography
+* timeline UI
+* family heritage feel
+
+Add navigation item:
+"About GK Shah"
+
+========================
+DATA INTEGRITY
+==============
+
+9. Add integrity scan utility
+
+Detect:
+
+* self-parent loops
+* circular ancestry
+* missing parent references
+* spouse pointing to self
+* invalid generations
+* orphan members
+
+Add admin-only diagnostics section.
+
+========================
+UX IMPROVEMENTS
+===============
+
+10. Save confirmation hardening
+
+Only show:
+"Saved successfully"
+
+AFTER:
+
+* Zustand update
+* localStorage persist
+* verification succeeds
+
+Do not show optimistic success too early.
+
+========================
+CODE QUALITY REQUIREMENTS
+=========================
+
+IMPORTANT:
+Do NOT do superficial patches.
+
+Trace:
+form hydration
+RHF controllers
+Zustand updates
+localStorage persistence
+GitHub sync
+analytics graph
+import parsing
+
+Use shared graph utilities instead of duplicate ancestry logic.
+
+Avoid introducing more hydration race conditions.
+
+After implementation:
+
+* run full typecheck
+* test import
+* test edit/reopen
+* test sync
+* test analytics
+* test city click filtering
+* test smart search
+
+Finally provide:
+
+1. exact files changed
+2. root causes found
+3. what was fixed
+4. how each issue was verified

@@ -5,13 +5,19 @@ import { MemberFilters } from "@/components/members/MemberFilters";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FamilyMember } from "@/types/family";
 
 export default function Members() {
   const { members, isLoaded } = useFamilyStore();
   const { isAdmin } = useAdminMode();
   const [filteredMembers, setFilteredMembers] = useState<FamilyMember[]>([]);
+
+  // Read ?city= query param on mount to support click-through from Statistics page
+  const initialCity = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("city") ?? "";
+  }, []);
 
   if (!isLoaded) return null;
 
@@ -32,9 +38,10 @@ export default function Members() {
         )}
       </div>
 
-      <MemberFilters 
-        members={members} 
-        onFilterChange={setFilteredMembers} 
+      <MemberFilters
+        members={members}
+        onFilterChange={setFilteredMembers}
+        initialCity={initialCity}
       />
 
       {filteredMembers.length === 0 ? (

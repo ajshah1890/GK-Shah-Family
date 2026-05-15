@@ -191,6 +191,12 @@ export default function MemberForm() {
       generationNumber: member.generationNumber,
     });
 
+    console.log("[GKShah] RESET VALUES", {
+      gender: member.gender,
+      generation: member.generation,
+      bloodGroup: member.bloodGroup,
+    });
+
     isHydrating.current = true;
     form.reset({
       fullName: member.fullName ?? "",
@@ -395,13 +401,16 @@ export default function MemberForm() {
       : cleared.has("spouseId") ? undefined : (orig.spouseId ?? undefined);
 
     // ── Gender ────────────────────────────────────────────────────────────────
-    // Use form value when present; fall back to original snapshot so a hydration
-    // race can never silently clear an existing gender.
+    // onValueChange normalises "none" → undefined before it reaches RHF, so
+    // _gender is always a valid enum value or undefined here.
+    // Fall back to the original snapshot when the form value is absent so a
+    // hydration gap can never silently clear an existing gender.
     const genderFinal: "Male" | "Female" | "Other" | undefined =
       _gender ?? orig.gender;
 
     // ── Blood group ───────────────────────────────────────────────────────────
-    // Same pattern: non-empty form value wins; empty falls back to original.
+    // onValueChange normalises "none" → "" before it reaches RHF.
+    // Non-empty form value wins; empty falls back to original.
     const bloodGroupFinal: string | undefined =
       (_bloodGroup !== undefined && _bloodGroup !== "")
         ? _bloodGroup
@@ -422,6 +431,7 @@ export default function MemberForm() {
     const anniversaryFinal = normalizeDate(rawAnniversary, orig.anniversary);
 
     // ── Generation ────────────────────────────────────────────────────────────
+    // onValueChange normalises "none" → "" before it reaches RHF.
     const generationFinal: string | undefined =
       (_generation !== undefined && _generation !== "")
         ? _generation
@@ -630,59 +640,65 @@ export default function MemberForm() {
                     <FormField
                       control={form.control}
                       name="gender"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Gender</FormLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val === "__unset__" ? undefined : val)}
-                            value={field.value ?? "__unset__"}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Gender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="__unset__">Select Gender</SelectItem>
-                              <SelectItem value="Male">Male</SelectItem>
-                              <SelectItem value="Female">Female</SelectItem>
-                              <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        console.log("[GKShah] Gender Select value:", field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                            <Select
+                              onValueChange={(val) => field.onChange(val === "none" ? undefined : val)}
+                              value={field.value || ""}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Gender" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Select Gender</SelectItem>
+                                <SelectItem value="Male">Male</SelectItem>
+                                <SelectItem value="Female">Female</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                     <FormField
                       control={form.control}
                       name="generation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Generation</FormLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(val === "__unset__" ? "" : val)}
-                            value={field.value || "__unset__"}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Generation" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="__unset__">Select Generation</SelectItem>
-                              <SelectItem value="1st Generation">1st Generation</SelectItem>
-                              <SelectItem value="2nd Generation">2nd Generation</SelectItem>
-                              <SelectItem value="3rd Generation">3rd Generation</SelectItem>
-                              <SelectItem value="4th Generation">4th Generation</SelectItem>
-                              <SelectItem value="5th Generation">5th Generation</SelectItem>
-                              <SelectItem value="6th Generation">6th Generation</SelectItem>
-                              <SelectItem value="7th Generation">7th Generation</SelectItem>
-                              <SelectItem value="8th Generation">8th Generation</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        console.log("[GKShah] Generation Select value:", field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel>Generation</FormLabel>
+                            <Select
+                              onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                              value={field.value || ""}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Generation" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Select Generation</SelectItem>
+                                <SelectItem value="1st Generation">1st Generation</SelectItem>
+                                <SelectItem value="2nd Generation">2nd Generation</SelectItem>
+                                <SelectItem value="3rd Generation">3rd Generation</SelectItem>
+                                <SelectItem value="4th Generation">4th Generation</SelectItem>
+                                <SelectItem value="5th Generation">5th Generation</SelectItem>
+                                <SelectItem value="6th Generation">6th Generation</SelectItem>
+                                <SelectItem value="7th Generation">7th Generation</SelectItem>
+                                <SelectItem value="8th Generation">8th Generation</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
                 </div>
@@ -1097,28 +1113,31 @@ export default function MemberForm() {
                 <FormField
                   control={form.control}
                   name="bloodGroup"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Blood Group</FormLabel>
-                      <Select
-                        onValueChange={(val) => field.onChange(val === "__unset__" ? "" : val)}
-                        value={field.value || "__unset__"}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Blood Group" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="__unset__">Select Blood Group</SelectItem>
-                          {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(bg => (
-                            <SelectItem key={bg} value={bg}>{bg}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    console.log("[GKShah] Blood Group Select value:", field.value);
+                    return (
+                      <FormItem>
+                        <FormLabel>Blood Group</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Blood Group" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Select Blood Group</SelectItem>
+                            {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(bg => (
+                              <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </CardContent>

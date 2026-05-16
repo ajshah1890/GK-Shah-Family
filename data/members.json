@@ -3751,19 +3751,34 @@
         "Manisha P. Shah",
         "Falguni P. Vakharia"
       ],
-      "phone": "9824399220",
-      "whatsapp": "9824399220",
+      "phone": "",
+      "whatsapp": "",
       "city": "Ahmedabad",
       "country": "India",
       "address": "C/5/1 Sagar Apartment, Nr Shyamal Cross Road, Satellite, Ahmedabad-380015",
       "education": "Metric, Mont.",
       "id": "a7867de7-3624-4b99-a112-e142e0dadd77",
       "addedAt": "2026-05-15T22:41:43.141Z",
-      "updatedAt": "2026-05-15T22:41:43.141Z",
+      "updatedAt": "2026-05-15T22:46:21.728Z",
       "childrenIds": [
         "451b63fa-40d7-4fbe-ba61-ca2b33776251",
         "f3963764-19b6-473c-8ac8-157bdfb87e5e"
-      ]
+      ],
+      "mapsLink": "",
+      "email": "",
+      "personalWebsite": "",
+      "linkedIn": "",
+      "instagram": "",
+      "profession": "",
+      "company": "",
+      "previousCompany": "",
+      "businessName": "",
+      "hobbies": "",
+      "skills": "",
+      "languagesSpoken": "",
+      "emergencyContact": "",
+      "notes": "",
+      "photo": "https://api.dicebear.com/7.x/avataaars/svg?seed=Lt.%20Kalpanaben%20S.%20Parekh%20(Kanchanben)"
     },
     {
       "memberId": "GK-G3-2002",
@@ -4078,5 +4093,5 @@
       "childrenIds": []
     }
   ],
-  "_savedAt": "2026-05-15T22:41:48.257Z"
+  "_savedAt": "2026-05-16T05:30:43.695Z"
 }

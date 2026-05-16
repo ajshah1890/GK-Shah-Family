@@ -2872,11 +2872,24 @@
       "education": "Diploma",
       "id": "400913b6-81f2-48cf-8366-3b6efde9bcd1",
       "addedAt": "2026-05-15T22:41:43.141Z",
-      "updatedAt": "2026-05-15T22:41:43.141Z",
+      "updatedAt": "2026-05-16T13:12:06.142Z",
       "childrenIds": [
         "51922f7e-e9de-4dcf-a956-44b8767fa4af",
         "59db3271-7403-462f-8c6a-d2c88b3d20cf"
-      ]
+      ],
+      "mapsLink": "",
+      "personalWebsite": "",
+      "linkedIn": "",
+      "instagram": "",
+      "company": "",
+      "previousCompany": "",
+      "businessName": "",
+      "hobbies": "",
+      "skills": "",
+      "languagesSpoken": "",
+      "emergencyContact": "",
+      "notes": "",
+      "photo": "https://api.dicebear.com/7.x/avataaars/svg?seed=Hetal%20S.%20Bagadia"
     },
     {
       "memberId": "GK-G4-1401",
@@ -4093,5 +4106,5 @@
       "childrenIds": []
     }
   ],
-  "_savedAt": "2026-05-16T05:30:43.695Z"
+  "_savedAt": "2026-05-16T13:12:28.520Z"
 }

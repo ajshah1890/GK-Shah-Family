@@ -21,20 +21,38 @@ interface MemberFiltersProps {
   members: FamilyMember[];
   onFilterChange: (filteredMembers: FamilyMember[]) => void;
   initialCity?: string;
+  initialGender?: string;
+  initialGeneration?: string;
+  initialBranch?: string;
+  initialCountry?: string;
+  initialProfession?: string;
 }
 
-export function MemberFilters({ members, onFilterChange, initialCity }: MemberFiltersProps) {
+function init(val: string | undefined): string {
+  return val && val !== "" ? val : "all";
+}
+
+export function MemberFilters({
+  members,
+  onFilterChange,
+  initialCity,
+  initialGender,
+  initialGeneration,
+  initialBranch,
+  initialCountry,
+  initialProfession,
+}: MemberFiltersProps) {
   const [search, setSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [cityFilter, setCityFilter] = useState(initialCity && initialCity !== "" ? initialCity : "all");
-  const [countryFilter, setCountryFilter] = useState("all");
-  const [professionFilter, setProfessionFilter] = useState("all");
-  const [mainBranchFilter, setMainBranchFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState(() => init(initialCity));
+  const [countryFilter, setCountryFilter] = useState(() => init(initialCountry));
+  const [professionFilter, setProfessionFilter] = useState(() => init(initialProfession));
+  const [mainBranchFilter, setMainBranchFilter] = useState(() => init(initialBranch));
   const [subBranchFilter, setSubBranchFilter] = useState("all");
   const [bloodGroupFilter, setBloodGroupFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
-  const [genderFilter, setGenderFilter] = useState("all");
-  const [generationFilter, setGenerationFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState(() => init(initialGender));
+  const [generationFilter, setGenerationFilter] = useState(() => init(initialGeneration));
 
   const cities = useMemo(() => Array.from(new Set(members.map(m => m.city).filter(Boolean) as string[])).sort(), [members]);
   const countries = useMemo(() => Array.from(new Set(members.map(m => m.country).filter(Boolean) as string[])).sort(), [members]);

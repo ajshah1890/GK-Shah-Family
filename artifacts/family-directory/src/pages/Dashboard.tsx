@@ -2,7 +2,8 @@ import { useFamilyStore } from "@/hooks/useFamilyStore";
 import { useMomentsStore } from "@/hooks/useMomentsStore";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
+import { TodaysEvents } from "@/components/dashboard/TodaysEvents";
+import { UpcomingFamilyEvents } from "@/components/dashboard/UpcomingFamilyEvents";
 import { OnThisDay } from "@/components/dashboard/OnThisDay";
 import {
   Users, UserPlus, FileText, PieChart, Info, MapPin,
@@ -209,8 +210,8 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UpcomingEvents members={members} type="birthday" />
-        <UpcomingEvents members={members} type="anniversary" />
+        <TodaysEvents members={members} />
+        <UpcomingFamilyEvents members={members} />
       </div>
 
       {activeMoments.length > 0 && (

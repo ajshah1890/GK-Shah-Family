@@ -13,10 +13,17 @@ export default function Members() {
   const { isAdmin } = useAdminMode();
   const [filteredMembers, setFilteredMembers] = useState<FamilyMember[]>([]);
 
-  // Read ?city= query param on mount to support click-through from Statistics page
-  const initialCity = useMemo(() => {
+  // Read all filter query params on mount to support click-through from Statistics
+  const initialFilters = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("city") ?? "";
+    return {
+      city:       params.get("city")       ?? "",
+      gender:     params.get("gender")     ?? "",
+      generation: params.get("generation") ?? "",
+      branch:     params.get("branch")     ?? "",
+      country:    params.get("country")    ?? "",
+      profession: params.get("profession") ?? "",
+    };
   }, []);
 
   if (!isLoaded) return null;
@@ -41,7 +48,12 @@ export default function Members() {
       <MemberFilters
         members={members}
         onFilterChange={setFilteredMembers}
-        initialCity={initialCity}
+        initialCity={initialFilters.city}
+        initialGender={initialFilters.gender}
+        initialGeneration={initialFilters.generation}
+        initialBranch={initialFilters.branch}
+        initialCountry={initialFilters.country}
+        initialProfession={initialFilters.profession}
       />
 
       {filteredMembers.length === 0 ? (

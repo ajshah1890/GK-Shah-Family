@@ -141,13 +141,6 @@ function buildUpcomingEvents(members: FamilyMember[]): UpcomingEvent[] {
     }
   }
 
-  console.log(
-    `[GKShah] UpcomingFamilyEvents — ` +
-    `birthdays: ${bdTotal} parsed, ${bdSkipped} skipped | ` +
-    `anniversaries: ${annTotal} parsed, ${annDupes} dupes removed, ${annSkipped} skipped | ` +
-    `total upcoming events: ${events.length}`
-  );
-
   return events.sort((a, b) => a.daysUntil - b.daysUntil);
 }
 

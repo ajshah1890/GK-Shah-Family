@@ -103,13 +103,6 @@ export function TodaysEvents({ members }: TodaysEventsProps) {
       }
     }
 
-    console.log(
-      `[GKShah] TodaysEvents — birthdays parsed: ${bdCount}, ` +
-      `anniversaries (pre-dedup): ${annCount}, ` +
-      `skipped invalid: ${skipped}, ` +
-      `today's events: ${result.length}`
-    );
-
     return result;
   }, [members, todayMonth, todayDay]);
 

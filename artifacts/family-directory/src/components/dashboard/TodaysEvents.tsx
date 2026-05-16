@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FamilyMember } from "@/types/family";
-import { parseISO, format } from "date-fns";
 import { Gift, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { WhatsAppWishButton } from "@/components/WhatsAppWishButton";
@@ -17,46 +16,102 @@ interface TodayEvent {
   dateLabel: string;
 }
 
+/**
+ * Safely extract { month (0-indexed), day } from any date string without
+ * going through the Date constructor — avoids UTC-vs-local timezone shifts
+ * that turn "2000-05-16T00:00:00.000Z" into May 15 in UTC+5:30.
+ */
+function parseDateParts(raw: string): { month: number; day: number } | null {
+  if (!raw || typeof raw !== "string") return null;
+  const clean = raw.trim().slice(0, 10); // grab "YYYY-MM-DD"
+  if (clean.length < 10 || clean[4] !== "-" || clean[7] !== "-") return null;
+  const month = parseInt(clean.slice(5, 7), 10) - 1; // 0-indexed
+  const day   = parseInt(clean.slice(8, 10), 10);
+  if (
+    isNaN(month) || isNaN(day) ||
+    month < 0 || month > 11 ||
+    day < 1 || day > 31
+  ) return null;
+  return { month, day };
+}
+
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
 export function TodaysEvents({ members }: TodaysEventsProps) {
   const today = new Date();
-  const mm = today.getMonth();
-  const dd = today.getDate();
+  const todayMonth = today.getMonth(); // 0-indexed
+  const todayDay   = today.getDate();
 
   const events = useMemo<TodayEvent[]>(() => {
     const result: TodayEvent[] = [];
+    let bdCount = 0, annCount = 0, skipped = 0;
+
+    // Dedup anniversaries: key = sorted(name, spouseName) + dateStr
+    const seenAnniversaryKeys = new Set<string>();
+
     for (const m of members) {
+      // ── Birthdays ──────────────────────────────────────────────────────────
       if (m.birthday) {
-        try {
-          const d = parseISO(m.birthday);
-          if (d.getMonth() === mm && d.getDate() === dd) {
+        const parts = parseDateParts(m.birthday);
+        if (parts) {
+          bdCount++;
+          if (parts.month === todayMonth && parts.day === todayDay) {
             result.push({
               member: m,
               type: "birthday",
               displayName: m.fullName,
-              dateLabel: format(d, "MMMM d"),
+              dateLabel: `${MONTH_NAMES[parts.month]} ${parts.day}`,
             });
           }
-        } catch {}
+        } else {
+          skipped++;
+        }
       }
+
+      // ── Anniversaries ──────────────────────────────────────────────────────
       if (m.anniversary) {
-        try {
-          const d = parseISO(m.anniversary);
-          if (d.getMonth() === mm && d.getDate() === dd) {
-            const name = m.spouseName
-              ? `${m.fullName} & ${m.spouseName}`
+        const parts = parseDateParts(m.anniversary);
+        if (parts) {
+          annCount++;
+          // Dedup: alphabetically sort both names so A+B == B+A
+          const spouseName = (m.spouseName ?? "").trim();
+          const coupleKey = [m.fullName.trim(), spouseName]
+            .map(n => n.toLowerCase())
+            .sort()
+            .join("|") + "|" + m.anniversary.slice(0, 10);
+
+          if (seenAnniversaryKeys.has(coupleKey)) continue;
+          seenAnniversaryKeys.add(coupleKey);
+
+          if (parts.month === todayMonth && parts.day === todayDay) {
+            const displayName = spouseName
+              ? `${m.fullName} & ${spouseName}`
               : m.fullName;
             result.push({
               member: m,
               type: "anniversary",
-              displayName: name,
-              dateLabel: format(d, "MMMM d"),
+              displayName,
+              dateLabel: `${MONTH_NAMES[parts.month]} ${parts.day}`,
             });
           }
-        } catch {}
+        } else {
+          skipped++;
+        }
       }
     }
+
+    console.log(
+      `[GKShah] TodaysEvents — birthdays parsed: ${bdCount}, ` +
+      `anniversaries (pre-dedup): ${annCount}, ` +
+      `skipped invalid: ${skipped}, ` +
+      `today's events: ${result.length}`
+    );
+
     return result;
-  }, [members, mm, dd]);
+  }, [members, todayMonth, todayDay]);
 
   return (
     <Card className="flex flex-col h-full">

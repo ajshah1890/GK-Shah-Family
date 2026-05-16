@@ -1,13 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FamilyMember } from "@/types/family";
-import {
-  parseISO,
-  format,
-  differenceInDays,
-  isBefore,
-  addYears,
-} from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { Gift, Calendar as CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 import { WhatsAppWishButton } from "@/components/WhatsAppWishButton";
@@ -27,30 +21,132 @@ interface UpcomingEvent {
   daysUntil: number;
 }
 
+/**
+ * Timezone-safe date part extractor.
+ * Works for "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS.sssZ", etc.
+ * Returns month as 0-indexed.
+ */
+function parseDateParts(
+  raw: string
+): { month: number; day: number } | null {
+  if (!raw || typeof raw !== "string") return null;
+  const clean = raw.trim().slice(0, 10);
+  if (clean.length < 10 || clean[4] !== "-" || clean[7] !== "-") return null;
+  const month = parseInt(clean.slice(5, 7), 10) - 1;
+  const day   = parseInt(clean.slice(8, 10), 10);
+  if (
+    isNaN(month) || isNaN(day) ||
+    month < 0 || month > 11 ||
+    day < 1 || day > 31
+  ) return null;
+  return { month, day };
+}
+
+/**
+ * Build the next calendar occurrence of a (month, day) pair from today.
+ * Returns the Date and how many days away it is.
+ * Returns null when month/day would produce an invalid date (e.g. Feb 30).
+ */
+function nextOccurrence(
+  month: number,
+  day: number,
+  todayYear: number,
+  todayMidnight: Date
+): { date: Date; daysUntil: number } | null {
+  let next = new Date(todayYear, month, day);
+  // Invalid date guard (e.g. Feb 30 → March 1 in JS — check day didn't shift)
+  if (next.getDate() !== day) return null;
+  if (next < todayMidnight) {
+    next = new Date(todayYear + 1, month, day);
+    if (next.getDate() !== day) return null;
+  }
+  const daysUntil = differenceInDays(next, todayMidnight);
+  return { date: next, daysUntil };
+}
+
 function buildUpcomingEvents(members: FamilyMember[]): UpcomingEvent[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayYear  = now.getFullYear();
+  const todayMonth = now.getMonth();
+  const todayDay   = now.getDate();
 
   const events: UpcomingEvent[] = [];
+  const seenAnniversaryKeys = new Set<string>();
+
+  let bdTotal = 0, annTotal = 0, bdSkipped = 0, annSkipped = 0, annDupes = 0;
 
   for (const m of members) {
-    for (const type of ["birthday", "anniversary"] as EventType[]) {
-      const raw = m[type];
-      if (!raw) continue;
-      try {
-        const d = parseISO(raw);
-        let next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-        if (isBefore(next, today)) next = addYears(next, 1);
-        const daysUntil = differenceInDays(next, today);
-        if (daysUntil === 0) continue; // today's events handled by TodaysEvents card
-        const displayName =
-          type === "anniversary" && m.spouseName
-            ? `${m.fullName} & ${m.spouseName}`
+    // ── Birthdays ────────────────────────────────────────────────────────────
+    if (m.birthday) {
+      const parts = parseDateParts(m.birthday);
+      if (!parts) {
+        bdSkipped++;
+      } else {
+        bdTotal++;
+        // Skip today (TodaysEvents handles today)
+        if (parts.month === todayMonth && parts.day === todayDay) continue;
+        const occ = nextOccurrence(parts.month, parts.day, todayYear, todayMidnight);
+        if (occ && occ.daysUntil > 0) {
+          events.push({
+            member: m,
+            type: "birthday",
+            displayName: m.fullName,
+            date: occ.date,
+            daysUntil: occ.daysUntil,
+          });
+        }
+      }
+    }
+
+    // ── Anniversaries ────────────────────────────────────────────────────────
+    if (m.anniversary) {
+      const parts = parseDateParts(m.anniversary);
+      if (!parts) {
+        annSkipped++;
+      } else {
+        annTotal++;
+        // Dedup: sort both names alphabetically so (A,B) === (B,A)
+        const spouseName = (m.spouseName ?? "").trim();
+        const coupleKey =
+          [m.fullName.trim(), spouseName]
+            .map(n => n.toLowerCase())
+            .sort()
+            .join("|") +
+          "|" +
+          m.anniversary.slice(0, 10);
+
+        if (seenAnniversaryKeys.has(coupleKey)) {
+          annDupes++;
+          continue;
+        }
+        seenAnniversaryKeys.add(coupleKey);
+
+        // Skip today (TodaysEvents handles today)
+        if (parts.month === todayMonth && parts.day === todayDay) continue;
+        const occ = nextOccurrence(parts.month, parts.day, todayYear, todayMidnight);
+        if (occ && occ.daysUntil > 0) {
+          const displayName = spouseName
+            ? `${m.fullName} & ${spouseName}`
             : m.fullName;
-        events.push({ member: m, type, displayName, date: next, daysUntil });
-      } catch {}
+          events.push({
+            member: m,
+            type: "anniversary",
+            displayName,
+            date: occ.date,
+            daysUntil: occ.daysUntil,
+          });
+        }
+      }
     }
   }
+
+  console.log(
+    `[GKShah] UpcomingFamilyEvents — ` +
+    `birthdays: ${bdTotal} parsed, ${bdSkipped} skipped | ` +
+    `anniversaries: ${annTotal} parsed, ${annDupes} dupes removed, ${annSkipped} skipped | ` +
+    `total upcoming events: ${events.length}`
+  );
 
   return events.sort((a, b) => a.daysUntil - b.daysUntil);
 }
@@ -64,11 +160,12 @@ const TAB_LABELS: Record<FilterTab, string> = {
 export function UpcomingFamilyEvents({ members }: UpcomingFamilyEventsProps) {
   const [tab, setTab] = useState<FilterTab>("all");
 
+  // Build full deduplicated list once; each tab slices independently to 15
   const allEvents = useMemo(() => buildUpcomingEvents(members), [members]);
 
   const events = useMemo(() => {
     const filtered =
-      tab === "all" ? allEvents : allEvents.filter((e) => e.type === tab);
+      tab === "all" ? allEvents : allEvents.filter(e => e.type === tab);
     return filtered.slice(0, 15);
   }, [allEvents, tab]);
 
@@ -81,7 +178,7 @@ export function UpcomingFamilyEvents({ members }: UpcomingFamilyEventsProps) {
             Upcoming Events
           </CardTitle>
           <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
-            {(["all", "birthday", "anniversary"] as FilterTab[]).map((t) => (
+            {(["all", "birthday", "anniversary"] as FilterTab[]).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -107,10 +204,7 @@ export function UpcomingFamilyEvents({ members }: UpcomingFamilyEventsProps) {
             </div>
             <p className="text-sm">
               No upcoming{" "}
-              {tab === "all"
-                ? "events"
-                : TAB_LABELS[tab].toLowerCase()}{" "}
-              in the next 30 days
+              {tab === "all" ? "events" : TAB_LABELS[tab].toLowerCase()}
             </p>
           </div>
         ) : (

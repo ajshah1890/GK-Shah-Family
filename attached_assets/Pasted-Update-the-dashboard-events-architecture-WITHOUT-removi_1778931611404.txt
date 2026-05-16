@@ -1,0 +1,154 @@
+Update the dashboard events architecture WITHOUT removing the existing usefulness of upcoming birthdays/anniversaries.
+
+====================================
+DASHBOARD EVENTS REDESIGN
+====================================
+
+Do NOT replace everything with one merged list.
+
+Instead create THREE separate sections:
+
+------------------------------------
+1. TODAY’S EVENTS
+------------------------------------
+
+Show ALL events happening today:
+- birthdays
+- anniversaries
+- custom events
+
+Grouped together in one clean card.
+
+Each item should show:
+- avatar
+- member/event name
+- event type badge
+- WhatsApp quick action
+- event color coding
+
+If empty:
+“No events today”
+
+------------------------------------
+2. UPCOMING EVENTS
+------------------------------------
+
+Separate compact dashboard card.
+
+Show ONLY next 5–10 upcoming events total.
+
+Mix:
+- birthdays
+- anniversaries
+- custom events
+
+Sorted chronologically.
+
+Display:
+- days remaining
+- event type
+- names
+- date
+
+Examples:
+- In 2d • Birthday • Pooja Shah
+- In 5d • Anniversary • Jayesh & Madhavi
+- In 8d • Family Reunion
+
+Add quick filter pills:
+- All
+- Birthdays
+- Anniversaries
+- Custom
+
+------------------------------------
+3. MONTH EVENTS / EVENT EXPLORER
+------------------------------------
+
+Add a THIRD dashboard section:
+“Events by Month”
+
+Features:
+- Month dropdown (Jan–Dec)
+- Event type filters
+- Scrollable list/grid
+- Search events
+- Group by date
+
+Show:
+- birthdays
+- anniversaries
+- custom family events
+
+Examples:
+- All May birthdays
+- June anniversaries
+- August reunions
+
+This acts as a lightweight dashboard preview of the full Events page.
+
+====================================
+CUSTOM EVENTS SYSTEM
+====================================
+
+Admins can:
+- add events
+- edit events
+- delete events
+
+Custom events support:
+- title
+- description
+- date
+- category
+- related members
+- recurring yearly toggle
+- image upload
+- location
+
+====================================
+EVENTS PAGE
+====================================
+
+Create dedicated sidebar page:
+“Events”
+
+Full features:
+- calendar view
+- month filtering
+- timeline
+- search
+- categories
+- upcoming events
+
+====================================
+ABOUT GK SHAH PAGE CMS
+====================================
+
+Admins can edit the About page directly from UI.
+
+Editable sections:
+- family story
+- values
+- timeline
+- founder info
+- motto
+- vision
+- legacy
+
+Persist using Zustand + GitHub sync.
+
+====================================
+IMPORTANT
+====================================
+
+Keep existing:
+- member system
+- statistics
+- GitHub sync
+- lineage
+- relationships
+- imports
+- dashboard cards
+
+Do NOT break current architecture.

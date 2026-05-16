@@ -4,7 +4,6 @@ import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { TodaysEvents } from "@/components/dashboard/TodaysEvents";
 import { UpcomingFamilyEvents } from "@/components/dashboard/UpcomingFamilyEvents";
-import { MonthEvents } from "@/components/dashboard/MonthEvents";
 import { OnThisDay } from "@/components/dashboard/OnThisDay";
 import {
   Users, UserPlus, FileText, PieChart, Info, MapPin,
@@ -214,8 +213,6 @@ export default function Dashboard() {
         <TodaysEvents members={members} />
         <UpcomingFamilyEvents members={members} />
       </div>
-
-      <MonthEvents members={members} />
 
       {activeMoments.length > 0 && (
         <OnThisDay moments={activeMoments} members={members} />

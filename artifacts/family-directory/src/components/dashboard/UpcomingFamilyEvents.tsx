@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FamilyMember } from "@/types/family";
 import { format, differenceInDays } from "date-fns";
-import { Gift, Calendar as CalendarIcon } from "lucide-react";
+import { Gift, Calendar as CalendarIcon, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { WhatsAppWishButton } from "@/components/WhatsAppWishButton";
 
@@ -74,16 +74,11 @@ function buildUpcomingEvents(members: FamilyMember[]): UpcomingEvent[] {
   const events: UpcomingEvent[] = [];
   const seenAnniversaryKeys = new Set<string>();
 
-  let bdTotal = 0, annTotal = 0, bdSkipped = 0, annSkipped = 0, annDupes = 0;
-
   for (const m of members) {
     // ── Birthdays ────────────────────────────────────────────────────────────
     if (m.birthday) {
       const parts = parseDateParts(m.birthday);
-      if (!parts) {
-        bdSkipped++;
-      } else {
-        bdTotal++;
+      if (parts) {
         // Skip today (TodaysEvents handles today)
         if (parts.month === todayMonth && parts.day === todayDay) continue;
         const occ = nextOccurrence(parts.month, parts.day, todayYear, todayMidnight);
@@ -102,10 +97,7 @@ function buildUpcomingEvents(members: FamilyMember[]): UpcomingEvent[] {
     // ── Anniversaries ────────────────────────────────────────────────────────
     if (m.anniversary) {
       const parts = parseDateParts(m.anniversary);
-      if (!parts) {
-        annSkipped++;
-      } else {
-        annTotal++;
+      if (parts) {
         // Dedup: sort both names alphabetically so (A,B) === (B,A)
         const spouseName = (m.spouseName ?? "").trim();
         const coupleKey =
@@ -116,10 +108,7 @@ function buildUpcomingEvents(members: FamilyMember[]): UpcomingEvent[] {
           "|" +
           m.anniversary.slice(0, 10);
 
-        if (seenAnniversaryKeys.has(coupleKey)) {
-          annDupes++;
-          continue;
-        }
+        if (seenAnniversaryKeys.has(coupleKey)) continue;
         seenAnniversaryKeys.add(coupleKey);
 
         // Skip today (TodaysEvents handles today)
@@ -153,13 +142,17 @@ const TAB_LABELS: Record<FilterTab, string> = {
 export function UpcomingFamilyEvents({ members }: UpcomingFamilyEventsProps) {
   const [tab, setTab] = useState<FilterTab>("all");
 
-  // Build full deduplicated list once; each tab slices independently to 15
+  const LIMIT = 10;
+
   const allEvents = useMemo(() => buildUpcomingEvents(members), [members]);
 
-  const events = useMemo(() => {
+  const { events, totalFiltered } = useMemo(() => {
     const filtered =
       tab === "all" ? allEvents : allEvents.filter(e => e.type === tab);
-    return filtered.slice(0, 15);
+    return {
+      events: filtered.slice(0, LIMIT),
+      totalFiltered: filtered.length,
+    };
   }, [allEvents, tab]);
 
   return (
@@ -257,6 +250,19 @@ export function UpcomingFamilyEvents({ members }: UpcomingFamilyEventsProps) {
           </ul>
         )}
       </CardContent>
+
+      <div className="px-4 py-2.5 border-t border-border flex items-center justify-between shrink-0">
+        <span className="text-xs text-muted-foreground">
+          {totalFiltered > LIMIT
+            ? `Showing ${events.length} of ${totalFiltered}`
+            : `${events.length} event${events.length !== 1 ? "s" : ""} upcoming`}
+        </span>
+        <Link href="/events">
+          <button className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+            View All Events <ArrowRight className="w-3 h-3" />
+          </button>
+        </Link>
+      </div>
     </Card>
   );
 }

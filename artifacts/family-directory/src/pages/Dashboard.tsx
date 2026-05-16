@@ -49,7 +49,7 @@ export default function Dashboard() {
   const showBackupBanner = !backupDismissed && members.length > 5 &&
     (daysSinceBackup === null || daysSinceBackup > 30);
 
-  const { thisMonthAdded, topCity, generationStats, recentMembers } = useMemo(() => {
+  const { thisMonthAdded, topCity, generationStats, uniqueGenerationCount, recentMembers } = useMemo(() => {
     const now = new Date();
     let thisMonthCount = 0;
     const cityCounts: Record<string, number> = {};
@@ -94,10 +94,13 @@ export default function Dashboard() {
       return 0;
     }).slice(0, 3);
 
+    const uniqueGenerationCount = Object.keys(genCounts).length;
+
     return {
       thisMonthAdded: thisMonthCount,
       topCity: topC !== "N/A" ? `${topC} (${maxC})` : topC,
       generationStats: genString,
+      uniqueGenerationCount,
       recentMembers: sortedMembers,
     };
   }, [members]);
@@ -203,9 +206,9 @@ export default function Dashboard() {
         />
         <StatCard
           title="Generations"
-          value={members.some(m => m.generation) ? members.filter(m => m.generation).length : 0}
+          value={uniqueGenerationCount || 0}
           icon={<GitBranch className="w-5 h-5 text-blue-500" />}
-          description={generationStats}
+          description={uniqueGenerationCount > 0 ? `Across ${uniqueGenerationCount} generation${uniqueGenerationCount === 1 ? "" : "s"}` : "No generation data"}
         />
       </div>
 

@@ -18,10 +18,10 @@ function firstName(member: FamilyMember): string {
 // ── Birthday messages ──────────────────────────────────────────────────────
 const BIRTHDAY: Record<WishStyle, (m: FamilyMember) => string> = {
   formal: (m) =>
-    `Dear ${firstName(m)},\n\nWishing you a very Happy Birthday. May this special day bring you joy, good health, and continued success. Many happy returns of the day!\n\nWith warm regards,\nG K Shah Family`,
+    `Dear ${firstName(m)},\n\nWishing you a very Happy Birthday. May this special day bring you joy, good health, and continued success. Many happy returns of the day!`,
 
   warm: (m) =>
-    `Happy Birthday, ${firstName(m)}! 🎉\n\nWishing you happiness, good health, and a wonderful year ahead. So glad to have you in our family! 💛\n\n— G K Shah Family`,
+    `Happy Birthday, ${firstName(m)}! 🎉\n\nWishing you happiness, good health, and a wonderful year ahead. So glad to have you in our family! 💛`,
 
   fun: (m) =>
     `Hey ${firstName(m)}! 🎂🥳\n\nHappy Birthday!! Hope your day is as amazing as you are! 🎊 Have an absolutely blast! 🎁🎈`,
@@ -30,10 +30,10 @@ const BIRTHDAY: Record<WishStyle, (m: FamilyMember) => string> = {
 // ── Anniversary messages ───────────────────────────────────────────────────
 const ANNIVERSARY: Record<WishStyle, (m: FamilyMember) => string> = {
   formal: (m) =>
-    `Dear ${firstName(m)},\n\nWishing you and your spouse a very Happy Anniversary. May your bond grow stronger and your love deeper with each passing year.\n\nWith warm regards,\nG K Shah Family`,
+    `Dear ${firstName(m)},\n\nWishing you and your spouse a very Happy Anniversary. May your bond grow stronger and your love deeper with each passing year.`,
 
   warm: (m) =>
-    `Happy Anniversary! 💐\n\nWishing you both many more years of happiness, love, and togetherness. Your partnership is truly beautiful! 💛\n\n— G K Shah Family`,
+    `Happy Anniversary! 💐\n\nWishing you both many more years of happiness, love, and togetherness. Your partnership is truly beautiful! 💛`,
 
   fun: (m) =>
     `Happy Anniversary ${firstName(m)}! 🥂💑\n\nHere's to many more years of love, laughter, and adventure together! You two are absolute goals! 🎊✨`,

@@ -233,20 +233,42 @@ export default function RelationshipExplorer() {
               {/* Headline result */}
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="p-6 text-center">
-                  <div className="flex items-center justify-center gap-3 flex-wrap mb-3">
+                  <div className="flex items-center justify-center gap-3 flex-wrap mb-4">
                     <span className="font-semibold text-lg">{memberA.fullName}</span>
                     <span className="text-muted-foreground">is</span>
                     <Badge className="text-sm px-3 py-1 font-semibold">{memberB.fullName}'s</Badge>
                   </div>
-                  <p className="text-4xl font-serif font-bold text-primary mb-2">{result.label}</p>
-                  {result.depthA > 0 && result.depthB > 0 && (
-                    <p className="text-sm text-muted-foreground">
+
+                  {/* English relation — large primary label */}
+                  <p className="text-4xl font-serif font-bold text-primary leading-tight">
+                    {result.label.english}
+                  </p>
+
+                  {/* Gujarati family term — muted amber/gold, smaller */}
+                  {result.label.gujarati && (
+                    <p className="mt-2 text-xl font-medium tracking-wide text-amber-600/80 dark:text-amber-400/70">
+                      ({result.label.gujarati})
+                    </p>
+                  )}
+
+                  {/* Common ancestor note */}
+                  {!result.isSpouseRelation && result.commonAncestor && result.depthA > 0 && result.depthB > 0 && (
+                    <p className="mt-3 text-sm text-muted-foreground">
                       via <span className="font-medium text-foreground">{result.commonAncestor.fullName}</span>
                     </p>
                   )}
-                  <div className="mt-4 pt-4 border-t border-primary/10 text-sm text-muted-foreground">
+
+                  {/* Reverse relation */}
+                  <div className="mt-5 pt-4 border-t border-primary/10 text-sm text-muted-foreground">
                     Conversely: <span className="font-medium text-foreground">{memberB.fullName}</span> is{" "}
-                    <span className="font-medium text-primary">{memberA.fullName}'s {result.reversedLabel}</span>
+                    <span className="font-medium text-primary">
+                      {memberA.fullName}'s {result.reversedLabel.english}
+                    </span>
+                    {result.reversedLabel.gujarati && (
+                      <span className="text-amber-600/70 dark:text-amber-400/60 ml-1">
+                        ({result.reversedLabel.gujarati})
+                      </span>
+                    )}
                   </div>
                 </CardContent>
               </Card>

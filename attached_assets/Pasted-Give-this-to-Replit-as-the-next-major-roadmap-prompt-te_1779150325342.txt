@@ -1,0 +1,330 @@
+Give this to Replit as the next major roadmap prompt:
+
+```text id="4xv7cn"
+MAJOR PLATFORM UPGRADE — EVENTS + MEMORIALS + ADVANCED FAMILY TREE
+
+We are evolving this from a directory into a full digital family platform.
+
+Implement the following 3 large feature systems carefully with scalable architecture and clean modular code.
+
+====================================================
+PART 1 — ADVANCED EVENT MANAGEMENT SYSTEM
+====================================================
+
+Upgrade Events from simple reminders into full family-event modules.
+
+================================
+1. EVENT TYPES
+================================
+
+Support:
+- Birthday
+- Anniversary
+- Family Gathering
+- Wedding
+- Engagement
+- Pooja
+- Business Event
+- Memorial / Remembrance
+- Custom
+
+Each event should support:
+- title
+- description
+- date/time
+- venue
+- Google Maps link
+- organizer(s)
+- linked members
+- photos
+- RSVP
+- contribution tracking
+- notes
+
+================================
+2. EVENT DETAIL PAGE
+================================
+
+Clicking an event opens a dedicated event page.
+
+Include:
+- banner/header image
+- event details
+- attendee list
+- RSVP status
+- location map
+- countdown timer
+- gallery/photos
+- comments/messages
+
+================================
+3. RSVP SYSTEM
+================================
+
+Allow:
+- Going
+- Maybe
+- Not Going
+
+Show counts visually.
+
+Admin can see:
+- full attendee breakdown
+- pending responses
+
+================================
+4. CONTRIBUTION TRACKING
+================================
+
+For weddings/gatherings:
+Track:
+- contributions
+- expenses
+- pledges
+- paid/unpaid
+
+Fields:
+- contributor
+- amount
+- note
+- status
+
+Admin-only visibility.
+
+================================
+5. EVENT PHOTO ALBUMS
+================================
+
+Each event can have:
+- uploaded photos
+- captions
+- grouped galleries
+
+Optional future-ready:
+- AI face tagging hooks
+
+================================
+6. EVENT FILTERS
+================================
+
+Filters:
+- upcoming
+- past
+- event type
+- month
+- branch
+- city
+
+================================
+7. DASHBOARD INTEGRATION
+================================
+
+Dashboard should show:
+- today’s events
+- next upcoming major event
+- RSVP reminders
+- recent family gatherings
+
+====================================================
+PART 2 — MEMORIAL MODE
+====================================================
+
+Create a respectful memorial system for deceased family members.
+
+================================
+1. MEMBER STATUS
+================================
+
+Add:
+- isDeceased
+- dateOfPassing
+
+When enabled:
+- respectful memorial styling
+- subtle iconography
+- no harsh dark themes
+
+================================
+2. MEMORIAL PROFILE
+================================
+
+Dedicated tribute section:
+- life summary
+- photos
+- achievements
+- memories
+- quotes
+- voice/video uploads (future-ready)
+
+================================
+3. REMEMBRANCE EVENTS
+================================
+
+Automatically generate:
+- remembrance anniversaries
+- “Remembering Today” dashboard section
+
+================================
+4. FAMILY MESSAGES
+================================
+
+Allow family members to post:
+- memories
+- tributes
+- messages
+
+Chronological format.
+
+================================
+5. VISUAL TREATMENT
+================================
+
+Elegant and minimal:
+- warm tones
+- soft typography
+- respectful layout
+
+NO funeral-style dark UI.
+
+====================================================
+PART 3 — NEXT-GEN INTERACTIVE FAMILY TREE
+====================================================
+
+Current tree is too static.
+
+We want modern ancestry-style exploration.
+
+================================
+1. ZOOM + PAN
+================================
+
+Support:
+- mouse wheel zoom
+- touch pinch zoom
+- drag/pan navigation
+
+Smooth animations.
+
+================================
+2. COLLAPSIBLE BRANCHES
+================================
+
+Each branch/subtree can:
+- expand
+- collapse
+
+Improve performance for large trees.
+
+================================
+3. FOCUS MODE
+================================
+
+Clicking a member:
+- centers them
+- highlights lineage path
+- dims unrelated nodes
+
+================================
+4. SPOUSE CONNECTORS
+================================
+
+Improve spouse visualization:
+- horizontal partner connectors
+- cleaner marriage links
+- visually distinguish bloodline vs marriage
+
+================================
+5. MATERNAL/PATERNAL DIFFERENTIATION
+================================
+
+Subtle visual distinctions:
+- paternal lineage
+- maternal lineage
+- married-in members
+
+Use elegant color accents only.
+
+================================
+6. GENERATION HEATMAP
+================================
+
+Visually indicate generations:
+- Gen1
+- Gen2
+- Gen3 etc.
+
+Could use:
+- spacing
+- tint intensity
+- subtle labels
+
+================================
+7. MEMBER CARDS
+================================
+
+Tree nodes should show:
+- photo/avatar
+- name
+- lifespan if deceased
+- generation
+- quick actions
+
+================================
+8. PERFORMANCE
+================================
+
+Must handle:
+- 500+ members smoothly
+
+Use:
+- virtualization
+- lazy subtree rendering
+- memoization
+
+================================
+9. MOBILE EXPERIENCE
+================================
+
+Critical:
+Tree must work well on mobile:
+- pinch zoom
+- horizontal drag
+- no overflow bugs
+
+====================================================
+PART 4 — ARCHITECTURE
+====================================================
+
+Refactor cleanly:
+- events module
+- memorial module
+- tree engine module
+
+Avoid giant monolithic files.
+
+====================================================
+PART 5 — DESIGN
+====================================================
+
+Maintain current elegant premium aesthetic:
+- ivory background
+- warm orange accents
+- serif headings
+- minimal clutter
+
+Think:
+“luxury family archive”
+
+NOT corporate admin dashboard.
+
+====================================================
+PART 6 — DELIVERY
+====================================================
+
+After implementation:
+- run full TypeScript build
+- run responsiveness checks
+- test mobile tree interactions
+- ensure no regression in relationships engine
+- commit on dev branch
+```

@@ -1,0 +1,246 @@
+MAJOR RELATIONSHIP ENGINE UPGRADE
+
+We need to significantly improve the relationship system to support:
+1. Accurate Indian/Gujarati family relations
+2. Better lineage traversal
+3. Marriage-aware relationship logic
+4. Dual-label output:
+   - English relation
+   - Gujarati-style family term in English script
+
+========================================
+PART 1 — FIX WRONG RELATION DETECTION
+========================================
+
+Current bug:
+Nehal S. Shah is being shown as:
+“1st Cousin Once Removed”
+
+But based on the lineage/path, he is actually:
+“Kaka” (father’s brother / paternal uncle generation)
+
+The engine is currently relying too much on generic western cousin math.
+
+Required:
+Build generation-aware + sibling-aware relation inference.
+
+Examples:
+- Father’s brother → Kaka
+- Father’s sister → Fui
+- Mother’s brother → Mama
+- Mother’s sister → Masi
+- Father’s elder brother wife → Kaki
+- Mother’s brother wife → Mami
+
+The algorithm must identify:
+- whether relation comes through father side or mother side
+- sibling-of-parent
+- spouse-of-sibling-of-parent
+- sibling generation offsets
+
+========================================
+PART 2 — ADD GUJARATI RELATION LABELS
+========================================
+
+Under the English relationship title, show Gujarati-family terminology in English script.
+
+Examples:
+
+Current:
+Great-Grandmother
+
+New:
+Great-Grandmother
+(Par Dadi)
+
+Current:
+Paternal Uncle
+(Kaka)
+
+Current:
+Maternal Uncle
+(Mama)
+
+Current:
+Paternal Aunt
+(Fui)
+
+Current:
+Maternal Aunt
+(Masi)
+
+Current:
+Brother’s Wife
+(Bhabhi)
+
+Current:
+Sister’s Husband
+(Jijaji)
+
+Current:
+Grandfather
+(Dada / Nana based on side)
+
+Current:
+Grandmother
+(Dadi / Nani based on side)
+
+Current:
+Brother
+(Bhai)
+
+Current:
+Sister
+(Didi / Ben)
+
+========================================
+PART 3 — RELATION MAPPING SYSTEM
+========================================
+
+Create explicit mapping rules instead of relying only on cousin formulas.
+
+Support at minimum:
+
+DIRECT:
+- Father
+- Mother
+- Son
+- Daughter
+- Grandfather
+- Grandmother
+- Great-Grandfather
+- Great-Grandmother
+
+PATERNAL:
+- Kaka
+- Kaki
+- Fui
+- Fuva
+
+MATERNAL:
+- Mama
+- Mami
+- Masi
+- Masa
+
+SIBLINGS:
+- Bhai
+- Ben / Didi
+
+IN-LAWS:
+- Bhabhi
+- Jijaji
+- Devar
+- Jeth
+- Nanand
+
+DESCENDANTS:
+- Pota
+- Poti
+- Dohitra
+
+Fallback:
+If no Gujarati-specific relation exists:
+- still show English relationship
+- optionally show nearest Gujarati family term
+
+========================================
+PART 4 — MARRIAGE-AWARE GRAPH
+========================================
+
+Relationship traversal must include:
+- parent edges
+- child edges
+- spouse edges
+
+So married-in members correctly connect into the tree.
+
+Examples:
+- spouse of Kaka → Kaki
+- spouse of Mama → Mami
+- spouse of sibling → Jijaji/Bhabhi
+
+========================================
+PART 5 — IMPROVE UI
+========================================
+
+Current:
+“Nehal S. Shah is Abhishek J. Shah’s 1st Cousin Once Removed”
+
+New format:
+------------------------------------
+Nehal S. Shah is Abhishek J. Shah’s
+
+Paternal Uncle
+
+(Kaka)
+------------------------------------
+
+Another example:
+Champaben Gandalal Shah is Abhishek J. Shah’s
+
+Great-Grandmother
+
+(Par Dadi)
+
+Gujarati label should:
+- appear below English label
+- smaller elegant typography
+- muted orange/gold styling
+- centered
+
+========================================
+PART 6 — PRIORITY LOGIC
+========================================
+
+Priority order:
+1. Explicit family-role relations
+2. Marriage-based relations
+3. Sibling-based relations
+4. Uncle/Aunt mappings
+5. Grandparent mappings
+6. Cousin formulas LAST
+
+So “Kaka” is preferred over “1st cousin once removed”.
+
+========================================
+PART 7 — DATA HEALTH IMPROVEMENT
+========================================
+
+Disconnected roots logic:
+Do NOT flag married-in members as disconnected if:
+- they have spouseId
+AND
+- spouse connects to lineage
+
+Add separate informational section:
+“Married-in Members”
+
+========================================
+PART 8 — TECHNICAL
+========================================
+
+Refactor relationship engine into:
+- graph traversal layer
+- path classification layer
+- relation inference layer
+- Gujarati terminology mapping layer
+
+Avoid giant nested if/else blocks.
+
+Add test cases for:
+- father
+- grandfather
+- maternal uncle
+- paternal uncle
+- spouse of uncle
+- cousin
+- sibling
+- married-in spouse
+
+Run:
+- full TypeScript build
+- relationship regression tests
+- mobile + desktop UI validation
+
+Commit on dev branch after completion.

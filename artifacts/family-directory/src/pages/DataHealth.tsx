@@ -175,13 +175,30 @@ export default function DataHealth() {
     [members]
   );
 
+  // Married-in members: no parent links, generation 2+, but have a spouse who IS connected
+  const marriedInMembers = useMemo(
+    () => members.filter(m => {
+      if (m.isArchived || m.fatherId || m.motherId) return false;
+      if ((m.generationNumber ?? 1) <= 1) return false;
+      if (!m.spouseId) return false;
+      const spouse = members.find(s => s.id === m.spouseId);
+      // Spouse is connected if they have parent links OR are gen-1 (root)
+      return !!spouse && (!!spouse.fatherId || !!spouse.motherId || (spouse.generationNumber ?? 99) <= 1);
+    }),
+    [members]
+  );
+
+  // Disconnected roots: unlinked members that are NOT married-in
+  const marriedInIds = useMemo(() => new Set(marriedInMembers.map(m => m.id)), [marriedInMembers]);
+
   const disconnectedRoots = useMemo(
     () => members.filter(m =>
       !m.isArchived &&
       !m.fatherId && !m.motherId &&
-      (m.generationNumber ?? 1) > 1
+      (m.generationNumber ?? 1) > 1 &&
+      !marriedInIds.has(m.id)
     ),
-    [members]
+    [members, marriedInIds]
   );
 
   const relationshipConflicts = useMemo(
@@ -376,12 +393,23 @@ export default function DataHealth() {
     {
       id: "disconnectedRoots",
       label: "Disconnected Sub-tree Roots",
-      description: "Members in generation 2+ with no parent links. They become isolated roots in the tree, disconnected from the main lineage.",
+      description: "Members in generation 2+ with no parent links and no connected spouse. They become isolated roots in the tree, disconnected from the main lineage.",
       severity: disconnectedRoots.length > 0 ? "warning" : "ok",
       count: disconnectedRoots.length,
       details: disconnectedRoots.map(m =>
-        `${m.fullName} (Gen ${m.generationNumber ?? "?"}) — no father or mother linked`
+        `${m.fullName} (Gen ${m.generationNumber ?? "?"}) — no father, mother, or connected spouse`
       ),
+    },
+    {
+      id: "marriedIn",
+      label: "Married-in Members",
+      description: "Members with no blood parent links who joined the family through marriage. This is expected and healthy — they are correctly excluded from Disconnected Roots.",
+      severity: "info",
+      count: marriedInMembers.length,
+      details: marriedInMembers.map(m => {
+        const spouse = members.find(s => s.id === m.spouseId);
+        return `${m.fullName}${spouse ? ` — spouse of ${spouse.fullName}` : ""}`;
+      }),
     },
     {
       id: "relationshipConflicts",

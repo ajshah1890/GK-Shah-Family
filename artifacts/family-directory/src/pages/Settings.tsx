@@ -1,3 +1,5 @@
+import { useCurrentMember } from "@/contexts/CurrentMemberContext";
+import { MemberAvatar } from "@/components/ProfileSelectModal";
 import { useFamilyStore, GITHUB_HYDRATION_DISABLED_KEY, SAVE_LOCK_DISABLED_KEY, MERGE_PROTECTION_DISABLED_KEY } from "@/hooks/useFamilyStore";
 import { useTheme } from "@/hooks/useTheme";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import {
   Download, Upload, Info, FileSpreadsheet, Shield,
   Camera, Database, AlertTriangle, CheckCircle2,
   Clock, Archive, History, Trash2, ChevronDown, ChevronUp,
-  CloudUpload, RefreshCw, Wifi, WifiOff, RotateCcw,
+  CloudUpload, RefreshCw, Wifi, WifiOff, RotateCcw, User, UserCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRef, useState, useMemo, useCallback } from "react";
@@ -42,6 +44,7 @@ export default function Settings() {
   const { moments } = useMomentsStore();
   const { theme } = useTheme();
   const { changePassword, isAdmin } = useAdminMode();
+  const { currentMember, isGuest, openProfileSelector, clearCurrentMember } = useCurrentMember();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newPassword, setNewPassword] = useState("");
@@ -304,6 +307,66 @@ export default function Settings() {
         <h1 className="text-3xl font-serif font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1">Manage app preferences and data.</p>
       </div>
+
+      {/* ── Your Profile ─────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-serif flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            Your Profile
+          </CardTitle>
+          <CardDescription>
+            Select your name to personalise your experience — RSVP to events, post memories, and see how others relate to you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {currentMember ? (
+            <div className="flex items-center gap-4">
+              <MemberAvatar member={currentMember} size="lg" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-base truncate">{currentMember.fullName}</p>
+                <p className="text-sm text-muted-foreground truncate">
+                  {[currentMember.generation, currentMember.city, currentMember.country]
+                    .filter(Boolean).join(" · ")}
+                </p>
+                {currentMember.memberId && (
+                  <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{currentMember.memberId}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={openProfileSelector} className="gap-1.5">
+                  <UserCircle2 className="w-3.5 h-3.5" />
+                  Switch Profile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground text-xs"
+                  onClick={() => { clearCurrentMember(); toast.info("Profile cleared"); }}
+                >
+                  Continue as Guest
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <UserCircle2 className="w-7 h-7 text-muted-foreground/50" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-muted-foreground">Viewing as Guest</p>
+                <p className="text-sm text-muted-foreground/70">
+                  Select your profile to unlock personalised features.
+                </p>
+              </div>
+              <Button size="sm" onClick={openProfileSelector} className="gap-1.5 shrink-0">
+                <UserCircle2 className="w-3.5 h-3.5" />
+                Select Profile
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* GitHub Sync (admin only) */}
       {isAdmin && (

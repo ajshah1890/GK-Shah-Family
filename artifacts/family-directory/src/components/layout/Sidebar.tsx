@@ -2,9 +2,12 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, Settings, Network, FileSpreadsheet,
   Lock, GitMerge, BarChart2, Shield, Search, Camera, Database, Info, CalendarDays,
+  UserCircle2, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
+import { useCurrentMember } from "@/contexts/CurrentMemberContext";
+import { MemberAvatar } from "@/components/ProfileSelectModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +35,7 @@ const adminNavItems = [
 export function Sidebar() {
   const [location] = useLocation();
   const { isAdmin, login, logout } = useAdminMode();
+  const { currentMember, isGuest, openProfileSelector } = useCurrentMember();
   const [password, setPassword] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -54,7 +58,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-64 border-r border-border bg-sidebar h-screen sticky top-0">
       <div className="p-6 flex items-center gap-3 border-b border-border">
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-serif font-bold text-xl">
+        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-serif font-bold text-xl shrink-0">
           S
         </div>
         <h1 className="font-serif font-bold text-lg leading-tight">
@@ -124,7 +128,35 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="p-4 border-t border-border">
+      {/* ── Profile chip ─────────────────────────────────────────────────────── */}
+      <div className="border-t border-border">
+        <button
+          onClick={openProfileSelector}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-sidebar-accent transition-colors text-left group"
+        >
+          {currentMember ? (
+            <MemberAvatar member={currentMember} size="sm" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <UserCircle2 className="w-4 h-4 text-muted-foreground" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate leading-tight">
+              {currentMember ? currentMember.fullName : "Guest"}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {currentMember
+                ? [currentMember.generation, currentMember.city].filter(Boolean).join(" · ") || "Switch profile"
+                : "Select your profile"}
+            </p>
+          </div>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      </div>
+
+      {/* ── Admin login / logout ──────────────────────────────────────────────── */}
+      <div className="px-4 pb-4 border-t border-border pt-3">
         {isAdmin ? (
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 text-primary font-medium">

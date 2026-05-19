@@ -4,6 +4,8 @@ import { MobileNav } from "./MobileNav";
 import { MobileDrawer } from "./MobileDrawer";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Menu, Search } from "lucide-react";
+import { useCurrentMember } from "@/contexts/CurrentMemberContext";
+import { MemberAvatar } from "@/components/ProfileSelectModal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,9 +30,7 @@ export function Layout({ children }: LayoutProps) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-serif font-bold text-xs shrink-0">
-              S
-            </div>
+            <MobileHeaderAvatar />
             <h1 className="font-serif font-bold text-base truncate">G K Shah Directory</h1>
           </div>
           <MobileSearchButton />
@@ -41,6 +41,28 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </main>
       <MobileNav />
+    </div>
+  );
+}
+
+function MobileHeaderAvatar() {
+  const { currentMember, openProfileSelector } = useCurrentMember();
+
+  if (currentMember) {
+    return (
+      <button
+        onClick={openProfileSelector}
+        className="shrink-0 hover:opacity-80 transition-opacity"
+        aria-label="Switch profile"
+      >
+        <MemberAvatar member={currentMember} size="sm" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-serif font-bold text-xs shrink-0">
+      S
     </div>
   );
 }

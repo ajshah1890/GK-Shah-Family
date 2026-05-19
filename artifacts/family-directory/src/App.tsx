@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { Layout } from "@/components/layout/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CurrentMemberProvider } from "@/contexts/CurrentMemberContext";
 
 import Dashboard from "@/pages/Dashboard";
 import Members from "@/pages/Members";
@@ -62,7 +63,9 @@ function App() {
         <TooltipProvider>
           <ErrorBoundary label="App">
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
+              <CurrentMemberProvider>
+                <Router />
+              </CurrentMemberProvider>
             </WouterRouter>
           </ErrorBoundary>
           <Toaster position="bottom-center" />

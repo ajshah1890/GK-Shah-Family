@@ -3,9 +3,12 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, Camera, Network, GitMerge, BarChart2,
   FileSpreadsheet, Settings, Shield, X, Lock, Search, CalendarDays, Info,
+  UserCircle2, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminMode } from "@/hooks/useAdminMode";
+import { useCurrentMember } from "@/contexts/CurrentMemberContext";
+import { MemberAvatar } from "@/components/ProfileSelectModal";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -38,6 +41,7 @@ interface MobileDrawerProps {
 export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
   const [location] = useLocation();
   const { isAdmin, login, logout } = useAdminMode();
+  const { currentMember, isGuest, openProfileSelector } = useCurrentMember();
   const [password, setPassword] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -97,18 +101,41 @@ export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
-          <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-serif font-bold text-base shrink-0">
-            S
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-serif font-bold text-sm leading-tight truncate">G K Shah</p>
-            <p className="text-[10px] text-muted-foreground">Family Directory</p>
-          </div>
+        {/* Header — profile chip or family logo */}
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border shrink-0">
+          {currentMember ? (
+            <button
+              onClick={() => { onClose(); setTimeout(openProfileSelector, 300); }}
+              className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+            >
+              <MemberAvatar member={currentMember} size="sm" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate leading-tight">{currentMember.fullName}</p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {[currentMember.generation, currentMember.city].filter(Boolean).join(" · ") || "Switch profile"}
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+            </button>
+          ) : (
+            <button
+              onClick={() => { onClose(); setTimeout(openProfileSelector, 300); }}
+              className="flex items-center gap-2.5 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+            >
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <UserCircle2 className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {isGuest ? "Viewing as Guest" : "Select profile"}
+                </p>
+                <p className="text-[10px] text-muted-foreground/60">Tap to personalise</p>
+              </div>
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0 ml-auto"
             aria-label="Close menu"
           >
             <X className="w-4 h-4" />
